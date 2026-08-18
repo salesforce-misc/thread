@@ -1,0 +1,61 @@
+# Copyright (c) 2026, Salesforce, Inc.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Thread
+options:
+  bundleIdPrefix: com.thread
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.9.4"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.4.24"
+    CURRENT_PROJECT_VERSION: "28"
+    GENERATE_INFOPLIST_FILE: NO
+targets:
+  Thread:
+    type: application
+    platform: macOS
+    sources:
+      - path: Thread
+      # Bundled so the MIT/BSD/Zlib notices ship with every copy of the app,
+      # as those licenses require of binary redistributions.
+      - path: THIRD-PARTY-NOTICES.md
+        buildPhase: resources
+    dependencies:
+      - package: Sparkle
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thread.app
+        PRODUCT_NAME: Thread
+        INFOPLIST_FILE: Thread/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Thread/Thread.entitlements
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Developer ID Application"
+        DEVELOPMENT_TEAM: HHBVQNWU3D
+        ENABLE_HARDENED_RUNTIME: YES
+        ENABLE_APP_SANDBOX: NO
+        SWIFT_STRICT_CONCURRENCY: minimal
+        ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      configs:
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: com.thread.app.dev
+          PRODUCT_NAME: Thread Dev

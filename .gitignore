@@ -1,0 +1,18 @@
+# Build output
+build/
+dist/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Sparkle tooling (downloaded locally; not part of the app)
+.sparkle-tools/
+
+# Per-developer signing and publishing settings (see release.config.sh.example)
+release.config.sh
+
+# macOS
+.DS_Store
+
+# NOTE: updates/ IS committed on purpose — it hosts appcast.xml + the DMGs
+# that Sparkle downloads (SUFeedURL points at raw.githubusercontent.com/.../updates/).
