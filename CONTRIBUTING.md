@@ -41,8 +41,8 @@ Use GitHub Issues page to submit issues, enhancement requests and discuss ideas.
 ### Bug Reports and Fixes
 
 - If you find a bug, please search for it in the
-  [Issues](https://github.com/james-barker_sfemu/thread/issues), and if it isn't already
-  tracked, [create a new issue](https://github.com/james-barker_sfemu/thread/issues/new).
+  [Issues](https://github.com/salesforce-misc/thread/issues), and if it isn't already
+  tracked, [create a new issue](https://github.com/salesforce-misc/thread/issues/new).
   Even if an Issue is closed, feel free to comment and add details, it will still be
   reviewed.
 - Issues that have already been identified as a bug (note: able to reproduce) will be
@@ -60,7 +60,7 @@ content never leaves your machine, and a bug report is not a good reason to brea
 ### New Features
 
 - If you'd like to add new functionality to this project, describe the problem you want to
-  solve in a [new Issue](https://github.com/james-barker_sfemu/thread/issues/new).
+  solve in a [new Issue](https://github.com/salesforce-misc/thread/issues/new).
 - Issues that have been identified as a feature request will be labelled `enhancement`.
 - If you'd like to implement the new feature, please wait for feedback from the project
   maintainers before spending too much time writing the code. In some cases,
@@ -73,7 +73,7 @@ content never leaves your machine, and a bug report is not a good reason to brea
   currently done, or you have any other change, we would be happy to hear about it!
   - If it's a trivial change, go ahead and [send a Pull Request](#creating-a-pull-request)
     with the changes you have in mind.
-  - If not, [open an Issue](https://github.com/james-barker_sfemu/thread/issues/new) to
+  - If not, [open an Issue](https://github.com/salesforce-misc/thread/issues/new) to
     discuss the idea first.
 
 # Contribution Checklist
