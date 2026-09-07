@@ -21,7 +21,8 @@ Open the `.dmg` and drag **Thread** to your Applications folder. The build is no
 - **Rich notes** — Take formatted notes right next to the transcript, with the keyboard shortcuts you already know.
 - **AI Enhance** — Turns rough notes into a clean, structured summary — overview, key points, decisions, and action items — automatically when you stop recording, or any time you ask.
 - **Ask your notes** — Chat with your meetings. Ask questions across everything you've captured and get answers drawn from your own notes and transcripts.
-- **Named speakers** — Transcript lines carry participants' names, not just `You` and `Meeting`.
+- **Notch** — Optional Liquid Glass strip on the MacBook notch: start or stop recording, see the timer, open the notepad, and chat while a call is going. Recording keeps running if you close the main window.
+- **Named speakers (experimental)** — Opt-in; off by default. Transcript lines can show participants' names instead of just `You` and `Meeting`. Reads Zoom, Google Meet, and Microsoft Teams, and can miss or mislabel people.
 - **Tasks** — Action items become a simple checklist you can tick off, edit, or add to.
 - **Smart term correction** — Thread learns the names and terms you use, so they come out spelled right.
 - **Fast search** — Instantly search across every note, transcript, and title.
@@ -37,7 +38,7 @@ Open the `.dmg` and drag **Thread** to your Applications folder. The build is no
 
 **Mute-aware capture.** `GoogleMeetMuteMonitor` reads Meet's mute state from the accessibility tree and gates microphone transcription accordingly, so muting yourself in the call stops you being transcribed.
 
-**Speaker attribution.** `SpeakerVisionMonitor` finds the active speaker in the host app's accessibility tree and attributes transcript lines to named participants. Google Meet, Microsoft Teams on the web and in the desktop app, and Zoom on the web are all read from a class marker on the speaking tile. Zoom's desktop app publishes no speaking indicator at all, so it attributes by elimination instead: when exactly one remote participant is unmuted, they are the speaker.
+**Speaker attribution.** Off by default as an experimental Setup toggle; without it, transcript lines stay `You` or `Meeting`. When enabled, `SpeakerVisionMonitor` finds the active speaker in the host app's accessibility tree and attributes lines to named participants. Google Meet, Microsoft Teams on the web and in the desktop app, and Zoom on the web are all read from a class marker on the speaking tile. Zoom's desktop app publishes no speaking indicator at all, so it attributes by elimination instead: when exactly one remote participant is unmuted, they are the speaker. Names can be missed or mislabeled.
 
 **Enhance.** Rewrites your rough notes into clean Markdown using the meeting transcript as evidence, and extracts action items with owners — only naming someone when the name appears verbatim, never guessing. Ships with a built-in default prompt, plus your own reusable templates.
 
