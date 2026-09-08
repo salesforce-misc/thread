@@ -35,6 +35,7 @@ struct ContentView: View {
     @StateObject private var search = SearchController()
     @StateObject private var glossary = Glossary()
     @StateObject private var enhanceTemplates = EnhanceTemplateStore()
+    @StateObject private var notesSync = NotesSyncController()
     /// Shared state for the notch overlay; observed here so its record button can
     /// drive the same consent-aware start/stop as the toolbar's.
     @ObservedObject private var notchModel = NotchController.shared.model
@@ -97,6 +98,10 @@ struct ContentView: View {
     /// Experimental: label turns with on-screen speaker names. Off by default;
     /// read at recording start, so flipping it applies to the next recording.
     @AppStorage(AppSettings.speakerNamesKey) private var speakerNamesEnabled = false
+    /// Mirror sessions into Apple Notes for reading on your phone. Off by default;
+    /// a Thread folder is created only after they pick an account and press Create Folder.
+    @AppStorage(AppSettings.notesSyncEnabledKey) private var notesSyncEnabled = false
+    @AppStorage(AppSettings.notesSyncAccountKey) private var notesSyncAccount = NotesAccount.iCloud.rawValue
     /// Comma-separated identity aliases used by local AI to attribute tasks and
     /// references to the note-taker.
     @AppStorage(AppSettings.yourNamesKey) private var yourNames = ""
@@ -183,9 +188,13 @@ struct ContentView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             Sidebar(store: store,
                     search: search,
+                    notesSync: notesSync,
                     selection: $selection,
                     showActions: !isCompact,
                     showInlineSearch: isCompact,
+                    notesSyncEnabled: notesSyncEnabled,
+                    notesSyncAccount: notesSyncAccount,
+                    isRecording: capture.isActive,
                     onToggleSearch: toggleSearch,
                     onOpenSetup: openSetup,
                     onOpenTasks: openTasks,
@@ -410,6 +419,7 @@ struct ContentView: View {
             // The all-terms list stays: it belongs to no note, and closing Setup
             // restores a selection, which would otherwise shut it as it opened.
             pendingCandidates = []
+            notesSync.lastError = nil
             // Opening a saved note ends the "new note" compose state, so a later
             // return to idle collapses to the compact window as usual.
             if case .session = newValue {
@@ -436,6 +446,11 @@ struct ContentView: View {
         .onReceive(store.$groups) { _ in
             if search.isActive { search.rebuild(from: indexFiles) }
             if showAI { engine.rebuild(from: indexFiles) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .threadSessionDidPersist)) { note in
+            guard notesSyncEnabled, notesSync.folderReady else { return }
+            guard let url = note.object as? URL else { return }
+            notesSync.scheduleUpsert(at: url, store: store, account: notesSyncAccount)
         }
         .onChange(of: showAI) { _, open in
             // Opening Ask: make sure the embedding index is current and re-check
@@ -497,6 +512,7 @@ struct ContentView: View {
                                     start: capture.startedAt ?? Date(),
                                     end: Date())
                 store.applyTextTransform({ glossary.correct($0) }, to: target)
+                NotificationCenter.default.post(name: .threadSessionDidPersist, object: target)
                 return
             }
             let started = capture.startedAt
@@ -557,6 +573,8 @@ struct ContentView: View {
                                    start: capture.startedAt, end: nil)
             }
         }
+        notesSync.refreshLinkedOnOpen(store: store, account: notesSyncAccount,
+                                      isRecording: capture.isActive)
     }
 
     /// Flattened file list handed to the search index.
@@ -766,6 +784,13 @@ struct ContentView: View {
                     .strokeBorder(.primary.opacity(0.1), lineWidth: 1)
             }
 
+            Text("Apple Notes")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+
+            notesSyncSettings
+
             Text("Context")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
@@ -834,6 +859,98 @@ struct ContentView: View {
             enhanceTemplateSettings
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var notesSyncSettings: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Image(systemName: NotesSyncController.uploadSymbol)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        Text("Apple Notes")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    Text("View sessions in Apple Notes. Thread copies them into a Thread folder so you can read them on your phone. Notes is a viewer, not a second editor.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Recording does not send. When you Stop, or save a summary or tasks, Thread creates that Note or updates it if it still lives in the folder. Anything you type in Notes is overwritten on the next copy.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 16)
+                Toggle("Copy to Notes", isOn: $notesSyncEnabled)
+                    .labelsHidden()
+                    .toggleStyle(SetupToggleStyle())
+            }
+
+            if notesSyncEnabled {
+                Divider().opacity(0.35)
+
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Folder location")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("iCloud appears on your iPhone. On My Mac stays on this computer.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 16)
+                    Picker("Notes account", selection: $notesSyncAccount) {
+                        Text(NotesAccount.iCloud.label).tag(NotesAccount.iCloud.rawValue)
+                        Text(NotesAccount.onMyMac.label).tag(NotesAccount.onMyMac.rawValue)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                    .onChange(of: notesSyncAccount) { _, _ in
+                        notesSync.accountChanged()
+                    }
+                }
+
+                HStack {
+                    if notesSync.folderReady {
+                        Label("Folder ready", systemImage: "checkmark.circle.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.primary)
+                    } else {
+                        Button(notesSync.isBusy ? "Creating…" : "Create Folder") {
+                            notesSync.ensureFolder(account: notesSyncAccount,
+                                                   store: store,
+                                                   isRecording: capture.isActive)
+                        }
+                        .controlSize(.small)
+                        .disabled(notesSync.isBusy)
+                    }
+                    Spacer()
+                }
+
+                if notesSync.folderReady {
+                    Text("Sessions copy automatically when they save, when Thread opens, and when you create the folder. Right-click a session to copy it again.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let error = notesSync.lastError {
+                    Text(error)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .glassEffect(AppAppearance.glass(), in: .rect(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(.primary.opacity(0.1), lineWidth: 1)
+        }
     }
 
     /// A summary and a way in, like the templates section below: terms are reviewed
@@ -1047,7 +1164,9 @@ struct ContentView: View {
                 paneSwitcher
                     .offset(x: -dockedColumnWidth / 2, y: toolbarGlyphDrop)
             }
-            .sharedBackgroundVisibility(toolbarPillVisibility)
+            // Own chrome so light mode still has a capsule; the system pill
+            // washes out against a light toolbar.
+            .sharedBackgroundVisibility(.hidden)
             // Enhance is not here: the template it will use and the button that runs
             // it live under the note's title, in `EnhanceBar`.
             //
@@ -1121,17 +1240,20 @@ struct ContentView: View {
             paneOption(.transcript, "Transcript", "text.bubble")
             paneOption(.notes, "Notes", "doc.text")
         }
+        .padding(.horizontal, 3)
+        .padding(.vertical, 2)
         // Clear glass hides the toolbar's own pills, which suits a lone glyph but
-        // leaves this pair of labels on the transcript itself, now that a recording
-        // scrolls up behind them. The frost across the band thins what passes under;
-        // a surface of its own is what holds the labels legible against it.
+        // leaves this pair of labels on the transcript itself. Tinted in light
+        // mode has the same problem: the system pill is there and invisible.
+        // A capsule of our own is the chrome in every appearance.
         if liquidGlass {
-            options
-                .padding(.horizontal, 3)
-                .padding(.vertical, 2)
-                .glassEffect(AppAppearance.glass(), in: .capsule)
+            options.glassEffect(AppAppearance.glass(), in: .capsule)
         } else {
             options
+                .background(Capsule().fill(Color.primary.opacity(0.08)))
+                .overlay {
+                    Capsule().strokeBorder(.primary.opacity(0.14), lineWidth: 1)
+                }
         }
     }
 
@@ -1728,7 +1850,7 @@ private struct SidebarActions: View {
 
     /// Room the list leaves for these, gaps included. Three 28pt glyphs in a row, plus
     /// clearance from the window's bottom edge.
-    static let footprint = CGSize(width: 96, height: 44)
+    static let footprint = CGSize(width: 98, height: 44)
 
     var body: some View {
         HStack(spacing: 2) {
@@ -1760,11 +1882,13 @@ private struct SidebarActions: View {
     private func button(systemName: String,
                         disabled: Bool = false,
                         help: String,
+                        pulsing: Bool = false,
                         action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(glyph)
+                .symbolEffect(.pulse, options: .repeating, isActive: pulsing)
                 .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
         }
@@ -1784,11 +1908,15 @@ private struct SidebarActions: View {
 private struct Sidebar: View {
     @ObservedObject var store: SessionStore
     @ObservedObject var search: SearchController
+    @ObservedObject var notesSync: NotesSyncController
     @Binding var selection: SidebarItem?
     let showActions: Bool
     /// In compact mode the toolbar (and its search glass) is hidden, so the
     /// pill is shown inline at the sidebar's top-right instead.
     let showInlineSearch: Bool
+    let notesSyncEnabled: Bool
+    let notesSyncAccount: String
+    let isRecording: Bool
     /// Opens/closes search; opening also reveals the sidebar.
     var onToggleSearch: () -> Void = {}
     /// Opens the Setup surface (Glossary, prompts, and related preferences).
@@ -2013,21 +2141,32 @@ private struct Sidebar: View {
             Text(file.title)
                 .lineLimit(1)
                 .contextMenu {
-                    Button("Rename") { beginEdit(file) }
-                    let others = store.folders.filter { $0 != file.url.deletingLastPathComponent() }
-                    if !others.isEmpty {
-                        Menu("Move to") {
-                            ForEach(others, id: \.self) { folder in
-                                Button(folder.lastPathComponent) { move(file, to: folder) }
-                            }
+                Button("Rename") { beginEdit(file) }
+                let others = store.folders.filter { $0 != file.url.deletingLastPathComponent() }
+                if !others.isEmpty {
+                    Menu("Move to") {
+                        ForEach(others, id: \.self) { folder in
+                            Button(folder.lastPathComponent) { move(file, to: folder) }
                         }
                     }
-                    Button("Reveal in Finder") {
-                        NSWorkspace.shared.activateFileViewerSelecting([file.url])
-                    }
-                    Button("Delete", role: .destructive) { delete(file) }
                 }
+                Button("Reveal in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([file.url])
+                }
+                if notesSyncEnabled && notesSync.folderReady {
+                    Button(file.notesSynced ? "Resync to Notes" : "Send to Notes") {
+                        syncNotes(file.url)
+                    }
+                    .disabled(notesSync.isBusy || isRecording)
+                }
+                Button("Delete", role: .destructive) { delete(file) }
+            }
         }
+    }
+
+    private func syncNotes(_ url: URL) {
+        if isRecording || notesSync.isBusy { return }
+        notesSync.syncSession(at: url, store: store, account: notesSyncAccount)
     }
 
     private func beginEdit(_ file: SessionFile) {
@@ -4548,6 +4687,9 @@ private struct SavedSessionView: View {
         .onReceive(NotificationCenter.default.publisher(for: .threadApplyCorrection)) { note in
             guard let req = note.object as? CorrectionRequest, req.url == url else { return }
             applyCorrection(variant: req.variant, canonical: req.canonical)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .threadFlushNotes)) { note in
+            if note.object == nil || (note.object as? URL) == url { flushSave() }
         }
         .onDisappear { flushSave() }
     }

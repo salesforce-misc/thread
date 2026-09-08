@@ -26,6 +26,7 @@
 		D1592D65FD2F4C754E5539A1 /* Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9EFF1428E6521EC06E64C86 /* Search.swift */; };
 		E82BEF8F0CDA204E898C2497 /* GoogleMeetMuteMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 895FE8990722EDB93592022A /* GoogleMeetMuteMonitor.swift */; };
 		E831CCA1462E03E0E3FAAB9F /* RichTextNotes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51307C330BFB633E0532705D /* RichTextNotes.swift */; };
+		EFFDCE5552736E1682C6731D /* NotesSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9A26383C34462B53DED7766 /* NotesSync.swift */; };
 		F668F5D7D0940800FDA522B3 /* CMSampleBuffer+PCM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93D98FFA2FE6B81DD9B25571 /* CMSampleBuffer+PCM.swift */; };
 		FE2C1AC9E026FC6586FCACA3 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8F918EB937704BF744CA122 /* SessionStore.swift */; };
 /* End PBXBuildFile section */
@@ -46,6 +47,7 @@
 		93D98FFA2FE6B81DD9B25571 /* CMSampleBuffer+PCM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMSampleBuffer+PCM.swift"; sourceTree = "<group>"; };
 		9AC76C042E09903C7B227310 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A41D77566E56D9CA64F02145 /* AIEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIEngine.swift; sourceTree = "<group>"; };
+		A9A26383C34462B53DED7766 /* NotesSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesSync.swift; sourceTree = "<group>"; };
 		B8F918EB937704BF744CA122 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		C7CFE572283F0C2EA6702957 /* VisualEffectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectView.swift; sourceTree = "<group>"; };
 		CA28B18B12EB03C3F0529920 /* Thread.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Thread.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -83,6 +85,7 @@
 				DD70667AD50EF45C061320C1 /* MeetingDetector.swift */,
 				4C418A9FC699A0E64C87E868 /* MeetingTranscriber.swift */,
 				09318E1EF0B533DE813A4348 /* Notch.swift */,
+				A9A26383C34462B53DED7766 /* NotesSync.swift */,
 				51307C330BFB633E0532705D /* RichTextNotes.swift */,
 				F9EFF1428E6521EC06E64C86 /* Search.swift */,
 				B8F918EB937704BF744CA122 /* SessionStore.swift */,
@@ -200,6 +203,7 @@
 				0A6A76368F5E3DB3A7FB0A98 /* MeetingDetector.swift in Sources */,
 				C6B69A2EF6C6C552D5287B54 /* MeetingTranscriber.swift in Sources */,
 				957EA31F1AE6828C9CE4F9B8 /* Notch.swift in Sources */,
+				EFFDCE5552736E1682C6731D /* NotesSync.swift in Sources */,
 				E831CCA1462E03E0E3FAAB9F /* RichTextNotes.swift in Sources */,
 				D1592D65FD2F4C754E5539A1 /* Search.swift in Sources */,
 				FE2C1AC9E026FC6586FCACA3 /* SessionStore.swift in Sources */,

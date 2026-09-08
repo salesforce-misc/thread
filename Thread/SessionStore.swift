@@ -26,6 +26,11 @@ extension Notification.Name {
     /// Posted (object = CorrectionRequest) when the user accepts a glossary
     /// suggestion, so the open note applies the fix in place.
     static let threadApplyCorrection = Notification.Name("threadApplyCorrection")
+    /// Posted (object = file URL) just before a Notes push so the open editor
+    /// flushes a pending notes debounce to disk. `nil` object means every open editor.
+    static let threadFlushNotes = Notification.Name("threadFlushNotes")
+    /// Posted (object = file URL) after a real session save (not live autosave).
+    static let threadSessionDidPersist = Notification.Name("threadSessionDidPersist")
 }
 
 /// A glossary correction to apply in place to a specific note file.
@@ -39,6 +44,8 @@ struct CorrectionRequest {
 struct SessionFile: Identifiable, Hashable {
     let url: URL
     let modified: Date
+    /// True once this file stores an Apple Notes id from a successful send.
+    let notesSynced: Bool
 
     var id: URL { url }
     var title: String { url.deletingPathExtension().lastPathComponent }
@@ -234,11 +241,18 @@ final class SessionStore: ObservableObject {
                 .filter { $0.pathExtension.lowercased() == "md" }
                 .map { url -> SessionFile in
                     let mod = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                    return SessionFile(url: url, modified: mod)
+                    let notesSynced = (try? String(contentsOf: url, encoding: .utf8))?
+                        .contains(SessionStore.notesIDTag) ?? false
+                    return SessionFile(url: url, modified: mod, notesSynced: notesSynced)
                 }
                 .sorted { $0.modified > $1.modified }
             return SessionGroup(folderURL: folder, files: files)
         }
+    }
+
+    /// Every saved session file in the library.
+    func allSessionURLs() -> [URL] {
+        groups.flatMap { $0.files.map(\.url) }
     }
 
     // MARK: - Write / rename / delete
@@ -283,6 +297,7 @@ final class SessionStore: ObservableObject {
             in: folder
         )
         writeMarkdown(to: url, entries: entries, notes: notes, start: start, end: end)
+        notifyPersisted(url)
         return url
     }
 
@@ -347,20 +362,21 @@ final class SessionStore: ObservableObject {
         let parts = Self.components(of: text)
         writeSections(to: url, header: parts.header, notes: notes,
                       tasks: parts.tasks, transcript: parts.transcript)
+        notifyPersisted(url)
     }
 
-    /// Rewrites notes + tasks together (used after an AI enhance), preserving the
-    /// transcript.
+    /// Rewrites Notes and Tasks together, preserving the transcript.
     func saveNotesAndTasks(_ url: URL, notes: String, tasks: [TaskItem]) {
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
         let parts = Self.components(of: text)
         writeSections(to: url, header: parts.header, notes: notes,
                       tasks: Self.tasksMarkdown(tasks), transcript: parts.transcript)
+        notifyPersisted(url)
     }
 
-    /// Applies a text transform (e.g. glossary correction) across a saved file's
-    /// notes, tasks, and transcript, rewriting it in place. The transcript's raw
-    /// Markdown (and its per-line timestamps) is preserved except for the
+    /// Applies a text transform across a saved file's notes, tasks, and
+    /// transcript, rewriting it in place. The transcript's raw Markdown
+    /// (and its per-line timestamps) is preserved except for the
     /// transformed words. Returns true if anything changed.
     @discardableResult
     func applyTextTransform(_ transform: (String) -> String, to url: URL) -> Bool {
@@ -389,6 +405,7 @@ final class SessionStore: ObservableObject {
         let parts = Self.components(of: text)
         writeSections(to: url, header: parts.header, notes: parts.notes,
                       tasks: Self.tasksMarkdown(tasks), transcript: parts.transcript)
+        notifyPersisted(url)
     }
 
     /// Serializes the four sections in a stable order (Notes → Tasks →
@@ -409,9 +426,16 @@ final class SessionStore: ObservableObject {
     }
 
     private func writeSections(to url: URL, header: String, notes: String,
-                               tasks: String, transcript: String) {
-        let out = Self.composeSections(header: header, notes: notes,
-                                       tasks: tasks, transcript: transcript)
+                               tasks: String, transcript: String,
+                               clearingNotesMeta: Bool = false) {
+        var header = header
+        if !clearingNotesMeta {
+            header = Self.headerByPreservingNotesMeta(header, fromFileAt: url)
+        }
+        let out = Self.composeSections(header: header,
+                                       notes: Self.strippingNotesMeta(notes),
+                                       tasks: Self.strippingNotesMeta(tasks),
+                                       transcript: Self.strippingNotesMeta(transcript))
         do {
             try out.data(using: .utf8)?.write(to: url, options: .atomic)
             refresh()
@@ -434,6 +458,7 @@ final class SessionStore: ObservableObject {
         let out = composeSections(header: parts.header, notes: parts.notes,
                                   tasks: tasksMarkdown(tasks), transcript: parts.transcript)
         try? out.data(using: .utf8)?.write(to: url, options: .atomic)
+        NotificationCenter.default.post(name: .threadSessionDidPersist, object: url)
     }
 
     /// Reads the Notes section (Markdown) from a saved file, or "" if none.
@@ -446,6 +471,28 @@ final class SessionStore: ObservableObject {
     func loadTasks(_ url: URL) -> [TaskItem] {
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
         return Self.parseTasks(Self.components(of: text).tasks)
+    }
+
+    /// The Apple Notes id stashed in the file after a successful push.
+    func appleNotesID(of url: URL) -> String? {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+        return Self.appleNotesID(in: text)
+    }
+
+    /// Writes (or replaces) the hidden Notes id comment in the file header so a
+    /// later push updates the same note instead of creating a duplicate.
+    func setAppleNotesID(_ id: String, on url: URL) {
+        let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+        let parts = Self.components(of: text)
+        let header = Self.headerBySettingNotesID(trimmed, in: parts.header)
+        writeSections(to: url, header: header, notes: parts.notes,
+                      tasks: parts.tasks, transcript: parts.transcript)
+    }
+
+    private func notifyPersisted(_ url: URL) {
+        NotificationCenter.default.post(name: .threadSessionDidPersist, object: url)
     }
 
     @discardableResult
@@ -466,6 +513,7 @@ final class SessionStore: ObservableObject {
         do {
             try FileManager.default.moveItem(at: url, to: dest)
             refresh()
+            notifyPersisted(dest)
             return dest
         } catch {
             NSLog("[store] rename failed: %@", error.localizedDescription)
@@ -762,6 +810,86 @@ final class SessionStore: ObservableObject {
                 notes: joinedTrimmed(notes),
                 tasks: joinedTrimmed(tasks),
                 transcript: joinedTrimmed(transcript) + "\n")
+    }
+
+    /// Hidden comment holding the Apple Notes id of the mirrored note, e.g.
+    /// `<!-- thread:notes-id x-coredata://… -->`.
+    static let notesIDTag = "<!-- thread:notes-id"
+    /// Legacy hash comments; stripped on rewrite so they don't land in the body.
+    static let notesHashTag = "<!-- thread:notes-hash"
+    static let notesLocalHashTag = "<!-- thread:notes-local"
+    static let notesTranscriptHashTag = "<!-- thread:notes-transcript"
+
+    nonisolated static func appleNotesID(in header: String) -> String? {
+        headerValue(notesIDTag, in: header)
+    }
+
+    nonisolated static func headerBySettingNotesID(_ id: String, in header: String) -> String {
+        headerBySetting(notesIDTag, value: id, in: header)
+    }
+
+    /// If `header` is missing the Notes id, copy it from anywhere in the
+    /// existing file so a notes save cannot drop the mirror link.
+    nonisolated static func headerByPreservingNotesMeta(_ header: String, fromFileAt url: URL) -> String {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return header }
+        var header = header
+        if appleNotesID(in: header) == nil, let id = appleNotesID(in: text) {
+            header = headerBySettingNotesID(id, in: header)
+        }
+        return header
+    }
+
+    nonisolated static func strippingNotesMeta(_ section: String) -> String {
+        section.components(separatedBy: "\n").filter {
+            let trimmed = $0.trimmingCharacters(in: .whitespaces)
+            return !trimmed.hasPrefix(notesIDTag)
+                && !trimmed.hasPrefix(notesHashTag)
+                && !trimmed.hasPrefix(notesLocalHashTag)
+                && !trimmed.hasPrefix(notesTranscriptHashTag)
+        }.joined(separator: "\n")
+    }
+
+    private nonisolated static func headerValue(_ tag: String, in header: String) -> String? {
+        for line in header.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix(tag) else { continue }
+            let value = trimmed
+                .replacingOccurrences(of: tag, with: "")
+                .replacingOccurrences(of: "-->", with: "")
+                .trimmingCharacters(in: .whitespaces)
+            return value.isEmpty ? nil : value
+        }
+        return nil
+    }
+
+    private nonisolated static func headerBySetting(_ tag: String, value: String, in header: String) -> String {
+        let safe = value
+            .replacingOccurrences(of: "-->", with: "->")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let comment = "\(tag) \(safe) -->"
+        var lines = header.components(separatedBy: "\n")
+        while lines.last?.trimmingCharacters(in: .whitespaces).isEmpty == true {
+            lines.removeLast()
+        }
+        if let idx = lines.firstIndex(where: {
+            $0.trimmingCharacters(in: .whitespaces).hasPrefix(tag)
+        }) {
+            lines[idx] = comment
+        } else {
+            lines.append(comment)
+        }
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    private nonisolated static func headerByRemoving(_ tag: String, in header: String) -> String {
+        var lines = header.components(separatedBy: "\n")
+        lines.removeAll {
+            $0.trimmingCharacters(in: .whitespaces).hasPrefix(tag)
+        }
+        while lines.last?.trimmingCharacters(in: .whitespaces).isEmpty == true {
+            lines.removeLast()
+        }
+        return lines.isEmpty ? "" : lines.joined(separator: "\n") + "\n"
     }
 
     // MARK: - Tasks

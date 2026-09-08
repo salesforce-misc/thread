@@ -10,7 +10,7 @@ Sessions are plain Markdown files in folders you choose, so your notes stay read
 
 ## Download
 
-**[⬇︎ Download the latest version](https://github.com/jamesarthurbarker/thread/releases/latest)**
+**[⬇︎ Download the latest version](https://github.com/salesforce-misc/thread/releases/latest)**
 
 Open the `.dmg` and drag **Thread** to your Applications folder. The build is notarized, so it opens without a Gatekeeper warning, and it keeps itself up to date automatically after that.
 
@@ -29,6 +29,7 @@ Open the `.dmg` and drag **Thread** to your Applications folder. The build is no
 - **Multiple recordings per session** — Add more recordings to an existing note; each one is timestamped so the timeline stays clear.
 - **Organized your way** — Keep notes in folders you choose, collapse and reorder them, and rename anything with a double-click.
 - **Auto-save** — Your transcript and notes save as you go, so nothing is lost.
+- **Apple Notes** — Optional. Send a saved session into Apple Notes (iCloud or On My Mac) so you can read it there. Thread still keeps the Markdown file on disk; Notes gets a copy.
 
 ## How it works
 
@@ -49,6 +50,8 @@ Open the `.dmg` and drag **Thread** to your Applications folder. The build is no
 **Rich text notes.** A Markdown-backed editor with headings, bold/italic/strikethrough, links, bullet and numbered lists, and checkbox tasks, driven by the Format menu and the usual shortcuts.
 
 **Full-library search.** An in-memory index over every note's title, notes, and transcript, rebuilt off the main thread and filtered live as you type.
+
+**Apple Notes.** Optional, one-way copy from Thread into Apple Notes. Setup chooses iCloud or On My Mac; Thread does not treat Notes as the source of truth, and turning this on requires Automation access to Notes.
 
 ## Requirements
 
@@ -71,13 +74,14 @@ Then build and run the `Thread` scheme. Debug builds install as a separate app (
 
 ### Permissions
 
-macOS will prompt on first use. All four are requested only when the corresponding feature runs:
+macOS will prompt on first use. Each is requested only when the corresponding feature runs:
 
 | Permission | Why |
 | --- | --- |
 | Microphone | Transcribing your own speech |
 | Screen Recording | `ScreenCaptureKit` system-audio capture of the other participants |
 | Automation (Chrome) | Reading tab URLs to detect an active Meet call |
+| Automation (Notes) | Optional copy of a saved session into Apple Notes |
 | Accessibility | Reading mute state and the active speaker from the meeting's UI |
 
 Thread is intentionally **not** sandboxed (`ENABLE_APP_SANDBOX: NO`) because accessibility inspection of another app's UI is incompatible with the sandbox. Hardened runtime is on, and the entitlements grant only audio input, Apple Events, and user-selected file access.
@@ -99,6 +103,7 @@ You pick one or more library folders; each becomes a section in the sidebar. If 
 | `Thread/AIEngine.swift` | Enhance, Ask, embeddings, and the model's tools |
 | `Thread/Glossary.swift` | Learned vocabulary and transcript correction |
 | `Thread/SessionStore.swift` | Library folders, Markdown read/write, autosave |
+| `Thread/NotesSync.swift` | Optional one-way copy of a session into Apple Notes |
 | `Thread/RichTextNotes.swift` | Markdown ↔ attributed string, the notes editor |
 | `Thread/Search.swift` | Library-wide search index |
 | `Thread/ContentView.swift` | The app UI |

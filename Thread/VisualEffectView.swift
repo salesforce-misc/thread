@@ -45,6 +45,11 @@ enum AppSettings {
     // Meet are not prompted again when Zoom Web support is added.
     static let browserMuteAccessibilityPromptedKey =
         "googleMeetMute.accessibilityPrompted"
+    // One-way copy into Apple Notes for viewing. Off until they turn it on
+    // and create a Thread folder.
+    static let notesSyncEnabledKey = "notesSync.enabled"
+    static let notesSyncAccountKey = "notesSync.account"
+    static let notesSyncFolderReadyKey = "notesSync.folderReady"
 }
 
 /// Whether Thread follows the system light/dark setting or pins itself to one.
