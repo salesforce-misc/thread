@@ -45,9 +45,9 @@
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Thread converts speech to text on-device, privately.</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Thread checks your browser for an active Google Meet call to offer transcription.</string>
+	<string>Thread checks your browser for an active Google Meet call, and can copy a saved session into Apple Notes so you can read it there.</string>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/jamesarthurbarker/thread/main/updates/appcast.xml</string>
+	<string>https://raw.githubusercontent.com/salesforce-misc/thread/main/updates/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>1q4tb1PpXWKZyvFTN6648fQiDvq7n1GiqcmJd4uW27Y=</string>
 	<key>SUEnableAutomaticChecks</key>

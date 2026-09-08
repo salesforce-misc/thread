@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Publish a built release: push the updates/ folder to the public feed repo,
-# tag it, and create the matching GitHub Release with the DMG attached.
+# Publish a built release: push the updates/ folder to the feed repository
+# (salesforce-misc/thread), tag it, and create the matching GitHub Release.
 #
 # Usage:
 #   ./release.sh          # build, sign, notarize, DMG, appcast
@@ -27,9 +27,8 @@
 # /releases/latest, which is GitHub Releases — a separate system that a push
 # does not touch. Skip the second and new downloaders get an old build.
 #
-# The feed repo holds only the README, assets, and updates/ — no source. This
-# script therefore commits onto the feed's history from a throwaway worktree,
-# rather than pushing the branch you develop on.
+# The feed lives in updates/ on the publish remote. This script commits that
+# folder from a throwaway worktree, rather than pushing unrelated local changes.
 
 set -euo pipefail
 

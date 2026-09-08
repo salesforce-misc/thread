@@ -34,14 +34,13 @@ THREAD_NOTARY_PROFILE="thread-notary"
 # Public URL that the updates/ folder is served from, with a trailing slash.
 # This must match SUFeedURL in Thread/Info.plist. If the two disagree, already
 # installed builds will quietly stop receiving updates.
-THREAD_DOWNLOAD_URL_PREFIX="https://raw.githubusercontent.com/OWNER/REPO/main/updates/"
+THREAD_DOWNLOAD_URL_PREFIX="https://raw.githubusercontent.com/salesforce-misc/thread/main/updates/"
 
 # --- publish.sh ---------------------------------------------------------------
 
-# The repository that serves the feed. It holds the README, assets, and
-# updates/ only; the source is not pushed to it.
-THREAD_PUBLISH_REMOTE="https://github.com/OWNER/REPO.git"
-THREAD_PUBLISH_REPO="OWNER/REPO"
+# The repository that serves the Sparkle feed (and, for this project, the source).
+THREAD_PUBLISH_REMOTE="https://github.com/salesforce-misc/thread.git"
+THREAD_PUBLISH_REPO="salesforce-misc/thread"
 
 # Branch on that repository which the feed is served from.
 THREAD_FEED_BRANCH="main"
