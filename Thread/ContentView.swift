@@ -84,9 +84,6 @@ struct ContentView: View {
     @State private var tasksReturnSelection: SidebarItem?
     /// Central Tasks filter, driven by the toolbar's All | Open switcher.
     @AppStorage("thread.allTasks.filter") private var taskFilter: TaskFilter = .all
-    /// Tracks the asynchronous Enhance run so the walkthrough advances only
-    /// after the rewritten note has actually finished saving.
-    @State private var walkthroughEnhanceStarted = false
     /// The one custom Enhance template expanded for editing in the template panel.
     @State private var editingEnhanceTemplateID: UUID?
     /// Appearance: "true" Liquid Glass (clear) vs the default tinted look.
@@ -112,16 +109,6 @@ struct ContentView: View {
     /// template from `enhanceTemplates`.
     @AppStorage(AppSettings.selectedEnhanceTemplateKey)
     private var selectedEnhanceTemplateID = ""
-    @AppStorage(AppSettings.walkthroughCompletedKey)
-    private var walkthroughCompleted = false
-    @AppStorage(AppSettings.walkthroughStepKey)
-    private var walkthroughStepRaw = -1
-    @AppStorage(AppSettings.walkthroughSavedSessionKey)
-    private var walkthroughSavedSessionPath = ""
-
-    private var walkthroughStep: WalkthroughStep? {
-        WalkthroughStep(rawValue: walkthroughStepRaw)
-    }
 
     /// Compact = idle on the blank live view with nothing to show. Recording,
     /// a transcript still on screen, or a saved note expands the window.
@@ -130,8 +117,6 @@ struct ContentView: View {
     private var isCompact: Bool {
         // Setup / Tasks replace the detail area and need the full width.
         if showSetup || showTasks { return false }
-        // Guided controls and copy need the normal detail width.
-        if walkthroughStep != nil { return false }
         // The AI panel needs the roomy detail area, so opening it expands.
         if showAI { return false }
         // Consent is presented over the full transcript surface.
@@ -353,17 +338,6 @@ struct ContentView: View {
                     .frame(width: 0, height: 0)
                     .accessibilityHidden(true)
             )
-            .overlay(alignment: walkthroughStep == .chat && showAI ? .top : .bottom) {
-                if let step = walkthroughStep,
-                   pendingRecordingStart == nil {
-                    walkthroughOverlay(for: step)
-                        .padding(.horizontal, 24)
-                        .padding(.top, step == .chat && showAI ? 18 : 0)
-                        .padding(.bottom, step == .chat && showAI ? 0 : 18)
-                        .transition(.opacity)
-                }
-            }
-            .animation(.easeInOut(duration: 0.22), value: walkthroughStepRaw)
     }
 
     var body: some View {
@@ -393,25 +367,6 @@ struct ContentView: View {
         }
         .onChange(of: isCompact) { _, compact in
             if compact { columnVisibility = .all }
-        }
-        .onChange(of: store.folders) { _, folders in
-            if walkthroughStep == .folder, !folders.isEmpty {
-                advanceWalkthrough()
-            }
-        }
-        .onChange(of: capture.isRunning) { _, running in
-            guard running else { return }
-            if walkthroughStep == .start {
-                advanceWalkthrough()
-            }
-        }
-        .onChange(of: isEnhancing) { _, enhancing in
-            if walkthroughStep == .notesAndEnhance,
-               walkthroughEnhanceStarted,
-               !enhancing {
-                walkthroughEnhanceStarted = false
-                advanceWalkthrough()
-            }
         }
         .onChange(of: selection) { _, newValue in
             // Glossary suggestions belong to the note that produced them. Close
@@ -496,8 +451,6 @@ struct ContentView: View {
         NotchController.shared.attach(capture: capture, engine: engine, store: store)
         NotchController.shared.setEnabled(notchEnabled)
         engine.prewarm()
-        startWalkthroughIfNeeded()
-        restoreWalkthroughSessionIfNeeded()
         // Live spelling correction: learned glossary terms self-correct in the
         // transcript as it streams in.
         capture.correct = { glossary.correct($0) }
@@ -518,19 +471,9 @@ struct ContentView: View {
             let started = capture.startedAt
             guard let url = store.finishLive(title: title, entries: entries, notes: notes,
                                              start: started, end: Date()) else { return }
-            let isWalkthroughEnhance = walkthroughStep == .notesAndEnhance
-            if isWalkthroughEnhance {
-                walkthroughSavedSessionPath = url.path
-                selection = .session(url)
-                pane = .notes
-                composingNew = false
-            }
             // Clean the freshly-stored transcript with everything learned so
             // far, so the saved record (not just the summary) reads correctly.
             store.applyTextTransform({ glossary.correct($0) }, to: url)
-            // The walkthrough explicitly teaches the Enhance button next, so
-            // don't also launch the normal automatic enhancement in parallel.
-            if isWalkthroughEnhance { return }
             // Auto-enhance the just-finished session's notes in the background.
             let rawTranscript = entries
                 .map { entry -> String in
@@ -646,36 +589,6 @@ struct ContentView: View {
 
     @ViewBuilder private var setupContent: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Walkthrough")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-
-            HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Learn Thread")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("A quick guide to folders, recording, notes, Enhance, Chat, and Setup.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 16)
-
-                Button(walkthroughStep == nil ? "Start Walkthrough" : "Restart Walkthrough") {
-                    startWalkthrough()
-                }
-                .controlSize(.small)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
-            .glassEffect(AppAppearance.glass(), in: .rect(cornerRadius: 14))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(.primary.opacity(0.1), lineWidth: 1)
-            }
-
             Text("Appearance")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
@@ -1300,287 +1213,10 @@ struct ContentView: View {
         liquidGlass ? 4 : 0
     }
 
-    @ViewBuilder
-    private func walkthroughOverlay(for step: WalkthroughStep) -> some View {
-        switch step {
-        case .folder:
-            WalkthroughCard(
-                step: step,
-                icon: "folder.badge.plus",
-                title: "Choose where Thread saves",
-                message: store.folders.isEmpty
-                    ? "Add a folder for your transcripts and notes. Thread keeps everything as local Markdown files."
-                    : "Your folder is ready. Existing files and folders are never changed by the walkthrough.",
-                primaryTitle: store.folders.isEmpty ? "Choose Folder" : "Continue",
-                onPrimary: {
-                    if store.folders.isEmpty {
-                        store.addFolder()
-                        if !store.folders.isEmpty { advanceWalkthrough() }
-                    } else {
-                        advanceWalkthrough()
-                    }
-                },
-                onSkip: completeWalkthrough
-            )
-
-        case .start:
-            let startFailed = capture.statusMessage.hasPrefix("Error:")
-                || capture.statusMessage.localizedCaseInsensitiveContains("denied")
-            WalkthroughCard(
-                step: step,
-                icon: "waveform.badge.mic",
-                title: "Start immediately",
-                message: capture.isStarting
-                    ? "Thread is requesting access and preparing local transcription. The walkthrough will resume after any required relaunch."
-                    : (startFailed
-                       ? "\(capture.statusMessage) Resolve the permission in System Settings, then try again. Your walkthrough progress is saved across relaunches."
-                       : "Start a short recording. Thread captures your microphone and meeting audio, then transcribes locally."),
-                primaryTitle: capture.isStarting
-                    ? "Starting"
-                    : (startFailed ? "Try Again" : "Start Recording"),
-                primaryDisabled: capture.isStarting,
-                onPrimary: startCapture,
-                onSkip: completeWalkthrough
-            )
-
-        case .notesAndEnhance:
-            if isViewingSaved && !capture.isActive {
-                if engine.isAvailable {
-                    WalkthroughCard(
-                        step: step,
-                        icon: "sparkles",
-                        title: isEnhancing ? "Enhancing your notes" : "Enhance your notes",
-                        message: isEnhancing
-                            ? "Thread is rewriting the saved note locally. The next step will appear when it finishes."
-                            : "Enhance rewrites your notes into a clearer structure while keeping the transcript as source context.",
-                        primaryTitle: isEnhancing ? "Enhancing" : "Enhance Notes",
-                        primaryDisabled: isEnhancing,
-                        onPrimary: triggerEnhance,
-                        onSkip: completeWalkthrough
-                    )
-                } else {
-                    WalkthroughCard(
-                        step: step,
-                        icon: "sparkles",
-                        title: "Enhance is unavailable",
-                        message: engine.unavailableReason
-                            ?? "On-device AI isn't available on this Mac. You can continue with the rest of the walkthrough.",
-                        primaryTitle: "Continue",
-                        onPrimary: advanceWalkthrough,
-                        onSkip: completeWalkthrough
-                    )
-                }
-            } else if !capture.isActive {
-                WalkthroughCard(
-                    step: step,
-                    icon: "waveform.badge.mic",
-                    title: "Record while taking notes",
-                    message: "Start a recording, switch to Notes, and type alongside the live transcript.",
-                    primaryTitle: "Start Recording",
-                    onPrimary: startCapture,
-                    onSkip: completeWalkthrough
-                )
-            } else if pane != .notes {
-                WalkthroughCard(
-                    step: step,
-                    icon: "note.text",
-                    title: "Type notes as you listen",
-                    message: "Open Notes without interrupting the recording. Your transcript continues in the background.",
-                    primaryTitle: "Open Notes",
-                    onPrimary: { pane = .notes },
-                    onSkip: completeWalkthrough
-                )
-            } else if capture.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                WalkthroughCard(
-                    step: step,
-                    icon: "keyboard",
-                    title: "Add a quick note",
-                    message: "Type anything in the Notes editor. Thread autosaves your work while the recording continues.",
-                    primaryTitle: nil,
-                    onPrimary: {},
-                    onSkip: completeWalkthrough
-                )
-            } else {
-                WalkthroughCard(
-                    step: step,
-                    icon: "stop.fill",
-                    title: "End and save",
-                    message: "Stop the recording. Thread will save your transcript and notes before showing Enhance.",
-                    primaryTitle: "Stop & Save",
-                    onPrimary: capture.stop,
-                    onSkip: completeWalkthrough
-                )
-            }
-
-        case .chat:
-            if !engine.isAvailable {
-                WalkthroughCard(
-                    step: step,
-                    icon: "message",
-                    title: "Chat is unavailable",
-                    message: engine.unavailableReason
-                        ?? "On-device AI isn't available on this Mac. Your saved transcript and notes are unaffected.",
-                    primaryTitle: "Continue",
-                    onPrimary: advanceWalkthrough,
-                    onSkip: completeWalkthrough
-                )
-            } else if showAI {
-                WalkthroughCard(
-                    step: step,
-                    icon: "message",
-                    title: "Ask about this session",
-                    message: "Try asking “What are the key points?” or “What are my action items?” Chat can search this saved session and your other notes.",
-                    primaryTitle: "Continue",
-                    onPrimary: {
-                        showAI = false
-                        advanceWalkthrough()
-                    },
-                    onSkip: completeWalkthrough
-                )
-            } else {
-                WalkthroughCard(
-                    step: step,
-                    icon: "message",
-                    title: "Ask Thread",
-                    message: "Chat answers questions using your saved transcripts and notes. The active recording must be saved first.",
-                    primaryTitle: "Open Chat",
-                    onPrimary: askAI,
-                    onSkip: completeWalkthrough
-                )
-            }
-
-        case .notch:
-            WalkthroughCard(
-                step: step,
-                icon: "macbook",
-                title: "Notch (optional)",
-                message: "Show a Liquid Glass strip on the MacBook notch to start or stop recording. You can change this any time in Setup.",
-                primaryTitle: "Turn On",
-                onPrimary: {
-                    notchEnabled = true
-                    advanceWalkthrough()
-                },
-                onSkip: completeWalkthrough,
-                secondaryTitle: "Not now",
-                onSecondary: {
-                    notchEnabled = false
-                    advanceWalkthrough()
-                }
-            )
-
-        case .appleNotes:
-            WalkthroughCard(
-                step: step,
-                icon: "note.text",
-                title: "Apple Notes (optional)",
-                message: "Copy saved sessions into Apple Notes so you can read them on your phone. Thread still keeps the Markdown files. You can create the Notes folder later in Setup.",
-                primaryTitle: "Turn On",
-                onPrimary: {
-                    notesSyncEnabled = true
-                    advanceWalkthrough()
-                },
-                onSkip: completeWalkthrough,
-                secondaryTitle: "Not now",
-                onSecondary: {
-                    notesSyncEnabled = false
-                    advanceWalkthrough()
-                }
-            )
-
-        case .setup:
-            WalkthroughCard(
-                step: step,
-                icon: showSetup ? "checkmark" : "gearshape",
-                title: showSetup ? "You're ready" : "Setup is always available",
-                message: showSetup
-                    ? "You can replay this walkthrough from the top of Setup at any time. Notch and Apple Notes can be changed there too."
-                    : "Open Setup to customize the notch, Apple Notes, appearance, naming, glossary terms, and Enhance templates.",
-                primaryTitle: showSetup ? "Done" : "Open Setup",
-                onPrimary: showSetup ? completeWalkthrough : openSetup,
-                onSkip: completeWalkthrough
-            )
-        }
-    }
-
     // MARK: - Actions
 
-    private func startWalkthroughIfNeeded() {
-        if walkthroughStep != nil { return }
-        guard !walkthroughCompleted else { return }
-        // This key ships with the walkthrough itself, so both brand-new and
-        // existing production users see the standard guide exactly once.
-        startWalkthrough()
-    }
-
-    private func startWalkthrough() {
-        if showSetup { closeSetup() }
-        showAI = false
-        pendingCandidates = []
-        showAllTerms = false
-        walkthroughEnhanceStarted = false
-        walkthroughSavedSessionPath = ""
-        walkthroughCompleted = false
-        walkthroughStepRaw = WalkthroughStep.folder.rawValue
-    }
-
-    private func advanceWalkthrough() {
-        guard let step = walkthroughStep else { return }
-        if let next = WalkthroughStep(rawValue: step.rawValue + 1) {
-            // Replaying the guide during an active recording should never get
-            // stuck waiting for another false→true recording transition.
-            let destination: WalkthroughStep =
-                (next == .start && capture.isActive) ? .notesAndEnhance : next
-            walkthroughStepRaw = destination.rawValue
-            if destination == .notesAndEnhance || destination == .chat {
-                engine.refreshAvailability()
-                engine.prewarm()
-            }
-        } else {
-            completeWalkthrough()
-        }
-    }
-
-    private func completeWalkthrough() {
-        walkthroughStepRaw = -1
-        walkthroughCompleted = true
-        walkthroughEnhanceStarted = false
-        walkthroughSavedSessionPath = ""
-    }
-
     private func triggerEnhance() {
-        if walkthroughStep == .notesAndEnhance {
-            engine.refreshAvailability()
-            guard engine.isAvailable else {
-                walkthroughEnhanceStarted = false
-                advanceWalkthrough()
-                return
-            }
-            walkthroughEnhanceStarted = true
-        }
         enhanceTick += 1
-        if walkthroughEnhanceStarted {
-            // If the saved view cannot begin the request (for example,
-            // availability changed between rendering and the tap), restore a
-            // usable card instead of leaving the walkthrough waiting forever.
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(1))
-                guard walkthroughStep == .notesAndEnhance,
-                      walkthroughEnhanceStarted,
-                      !isEnhancing else { return }
-                walkthroughEnhanceStarted = false
-                engine.refreshAvailability()
-                if !engine.isAvailable { advanceWalkthrough() }
-            }
-        }
-    }
-
-    private func restoreWalkthroughSessionIfNeeded() {
-        guard walkthroughStep == .notesAndEnhance || walkthroughStep == .chat,
-              !walkthroughSavedSessionPath.isEmpty else { return }
-        let url = URL(fileURLWithPath: walkthroughSavedSessionPath)
-        guard FileManager.default.fileExists(atPath: url.path) else { return }
-        selection = .session(url)
-        pane = .notes
     }
 
     private func startCapture() {
@@ -3608,7 +3244,7 @@ private struct EnhanceBar: View {
     /// Empty selects Thread's built-in Default; otherwise a template's UUID string.
     @Binding var selectedID: String
     /// Display name for `selectedID`, resolved by the parent (which needs it for the
-    /// Setup row and the walkthrough copy too).
+    /// Setup row too).
     var name: String
     var isEnhancing: Bool
     var isAvailable: Bool
@@ -4608,8 +4244,7 @@ private struct SavedSessionView: View {
     /// When true (a just-promoted notes-only note), focus the notes editor on
     /// appear so the user can keep typing without clicking.
     var autofocusNotes: Bool = false
-    /// Runs the enhance through the parent rather than calling `enhance()` here, so
-    /// it stays gated on the walkthrough's step.
+    /// Runs the enhance through the parent rather than calling `enhance()` here.
     var onEnhance: () -> Void = {}
     var onOpenTemplates: (Bool) -> Void = { _ in }
     /// True while this note's tasks are docked on the right, so the chip that opens

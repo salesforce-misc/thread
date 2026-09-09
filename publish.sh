@@ -24,8 +24,9 @@
 # Two things have to happen for a release to reach users, and they are easy to
 # confuse. Sparkle reads updates/appcast.xml, so installed copies update as soon
 # as that folder is pushed. The README's download button points at
-# /releases/latest, which is GitHub Releases — a separate system that a push
-# does not touch. Skip the second and new downloaders get an old build.
+# /releases/latest/download/Thread.dmg, which is GitHub Releases — a separate
+# system that a push does not touch. Skip the second and new downloaders get an
+# old build.
 #
 # The feed lives in updates/ on the publish remote. This script commits that
 # folder from a throwaway worktree, rather than pushing unrelated local changes.
@@ -75,7 +76,11 @@ echo "==> Fetching the feed's current head"
 git -C "$ROOT" fetch -q "$PUBLISH_REMOTE" "$FEED_BRANCH:refs/remotes/publish/$FEED_BRANCH" --force
 
 WORKTREE="$(mktemp -d)/feed"
-cleanup() { git -C "$ROOT" worktree remove --force "$WORKTREE" 2>/dev/null || true; }
+STABLE_DIR=""
+cleanup() {
+  git -C "$ROOT" worktree remove --force "$WORKTREE" 2>/dev/null || true
+  [[ -n "$STABLE_DIR" ]] && rm -rf "$STABLE_DIR"
+}
 trap cleanup EXIT
 
 git -C "$ROOT" worktree add -q "$WORKTREE" --detach "refs/remotes/publish/$FEED_BRANCH"
@@ -106,7 +111,12 @@ else
   echo "==> Cutting the GitHub Release"
   # --latest explicitly: GitHub otherwise picks by its own ordering, and a
   # backfilled older release can end up as the one the download button serves.
-  gh release create "v$VERSION" "$DMG" \
+  # Attach Thread.dmg as well so the README can download the latest build
+  # without a versioned filename.
+  STABLE_DIR="$(mktemp -d)"
+  STABLE_DMG="$STABLE_DIR/Thread.dmg"
+  cp "$DMG" "$STABLE_DMG"
+  gh release create "v$VERSION" "$DMG" "$STABLE_DMG" \
     --repo "$PUBLISH_REPO" \
     --target "$HEAD_SHA" \
     --title "Thread $VERSION" \

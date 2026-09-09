@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		0A6A76368F5E3DB3A7FB0A98 /* MeetingDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD70667AD50EF45C061320C1 /* MeetingDetector.swift */; };
 		2774DC0F698E50BE88CD703D /* AudioCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12C059C0BD7D4F18AC7A9532 /* AudioCaptureController.swift */; };
-		34B3FBA322456EEBC8032849 /* Walkthrough.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29135003E367A2FB661FBECF /* Walkthrough.swift */; };
 		365E2768224C71A8E3CD7B6C /* SpeakerVisionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE6FE5B2352353CAD96D0390 /* SpeakerVisionMonitor.swift */; };
 		3852E8124C309D44401A5BCC /* ThreadApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D208D015765D65C9C34BB8E4 /* ThreadApp.swift */; };
 		5350BDA0C9E96363E708CEE4 /* VisualEffectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7CFE572283F0C2EA6702957 /* VisualEffectView.swift */; };
@@ -34,7 +33,6 @@
 /* Begin PBXFileReference section */
 		09318E1EF0B533DE813A4348 /* Notch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notch.swift; sourceTree = "<group>"; };
 		12C059C0BD7D4F18AC7A9532 /* AudioCaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureController.swift; sourceTree = "<group>"; };
-		29135003E367A2FB661FBECF /* Walkthrough.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Walkthrough.swift; sourceTree = "<group>"; };
 		3C42E9A70B0CD5F903B2E22F /* MeetAccessibilityProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetAccessibilityProbe.swift; sourceTree = "<group>"; };
 		4C418A9FC699A0E64C87E868 /* MeetingTranscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingTranscriber.swift; sourceTree = "<group>"; };
 		51307C330BFB633E0532705D /* RichTextNotes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextNotes.swift; sourceTree = "<group>"; };
@@ -94,7 +92,6 @@
 				D208D015765D65C9C34BB8E4 /* ThreadApp.swift */,
 				611EDC08EC682618508CF59E /* TranscriptionDiagnostics.swift */,
 				C7CFE572283F0C2EA6702957 /* VisualEffectView.swift */,
-				29135003E367A2FB661FBECF /* Walkthrough.swift */,
 			);
 			path = Thread;
 			sourceTree = "<group>";
@@ -211,7 +208,6 @@
 				3852E8124C309D44401A5BCC /* ThreadApp.swift in Sources */,
 				9B83A57FA5BA893A459AF625 /* TranscriptionDiagnostics.swift in Sources */,
 				5350BDA0C9E96363E708CEE4 /* VisualEffectView.swift in Sources */,
-				34B3FBA322456EEBC8032849 /* Walkthrough.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -252,7 +248,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 30;
+				CURRENT_PROJECT_VERSION = 100;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -272,7 +268,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.4.26;
+				MARKETING_VERSION = 1.0.00;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -318,7 +314,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 30;
+				CURRENT_PROJECT_VERSION = 100;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -332,7 +328,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.4.26;
+				MARKETING_VERSION = 1.0.00;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

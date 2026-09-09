@@ -10,7 +10,9 @@ Sessions are plain Markdown files in folders you choose, so your notes stay read
 
 ## Download
 
-**[⬇︎ Download the latest version](https://github.com/salesforce-misc/thread/releases/latest)**
+**[⬇︎ Download the latest version](https://github.com/salesforce-misc/thread/releases/latest/download/Thread.dmg)**
+
+[See all releases](https://github.com/salesforce-misc/thread/releases)
 
 Open the `.dmg` and drag **Thread** to your Applications folder. The build is notarized, so it opens without a Gatekeeper warning, and it keeps itself up to date automatically after that.
 
@@ -137,7 +139,7 @@ This repository also hosts the [Sparkle](https://sparkle-project.org) auto-updat
 
 `release.sh` builds Release, signs with Developer ID, re-signs Sparkle's nested XPC helpers inside-out (xcodebuild doesn't, and notarization rejects them otherwise), notarizes and staples both the app and the DMG, then regenerates `updates/appcast.xml` with `generate_appcast`.
 
-A release reaches people two different ways, and only doing one of them is the easy mistake. Sparkle reads `updates/appcast.xml`, so **installed copies** update as soon as that folder is pushed — which is why `updates/` is deliberately not gitignored. The README's download button points at `/releases/latest`, which is **GitHub Releases**, a separate system that a push doesn't touch; skip it and new downloaders get whatever the last tagged release was. `publish.sh` does both, and is safe to re-run: it skips the push when the feed already matches and leaves an existing release alone.
+A release reaches people two different ways, and only doing one of them is the easy mistake. Sparkle reads `updates/appcast.xml`, so **installed copies** update as soon as that folder is pushed — which is why `updates/` is deliberately not gitignored. The README's download button points at `/releases/latest/download/Thread.dmg`, which is **GitHub Releases**, a separate system that a push doesn't touch; skip it and new downloaders get whatever the last tagged release was. `publish.sh` does both, and is safe to re-run: it skips the push when the feed already matches and leaves an existing release alone.
 
 Old DMGs are kept so Sparkle can build delta patches against them. If you rebuild a version that has already shipped, delete its delta files so `generate_appcast` rebuilds them against the new DMG rather than leaving stale patches in the feed — a stale delta patches users up to the wrong binary.
 

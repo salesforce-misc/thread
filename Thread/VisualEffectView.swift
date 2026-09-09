@@ -33,9 +33,6 @@ enum AppSettings {
     static let selectedEnhanceTemplateKey = "selectedEnhanceTemplate"
     static let sessionNamingTemplateKey = "sessionNamingTemplate"
     static let defaultSessionNamingTemplate = "Session {date} {time}"
-    static let walkthroughCompletedKey = "walkthrough.completed"
-    static let walkthroughStepKey = "walkthrough.currentStep"
-    static let walkthroughSavedSessionKey = "walkthrough.savedSessionPath"
     // Whether the Liquid Glass notch overlay hugging the MacBook notch is shown.
     static let notchEnabledKey = "notch.enabled"
     // Experimental: label transcript turns with on-screen speaker names read from
