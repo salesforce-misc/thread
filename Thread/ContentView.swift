@@ -1449,14 +1449,52 @@ struct ContentView: View {
                 )
             }
 
+        case .notch:
+            WalkthroughCard(
+                step: step,
+                icon: "macbook",
+                title: "Notch (optional)",
+                message: "Show a Liquid Glass strip on the MacBook notch to start or stop recording. You can change this any time in Setup.",
+                primaryTitle: "Turn On",
+                onPrimary: {
+                    notchEnabled = true
+                    advanceWalkthrough()
+                },
+                onSkip: completeWalkthrough,
+                secondaryTitle: "Not now",
+                onSecondary: {
+                    notchEnabled = false
+                    advanceWalkthrough()
+                }
+            )
+
+        case .appleNotes:
+            WalkthroughCard(
+                step: step,
+                icon: "note.text",
+                title: "Apple Notes (optional)",
+                message: "Copy saved sessions into Apple Notes so you can read them on your phone. Thread still keeps the Markdown files. You can create the Notes folder later in Setup.",
+                primaryTitle: "Turn On",
+                onPrimary: {
+                    notesSyncEnabled = true
+                    advanceWalkthrough()
+                },
+                onSkip: completeWalkthrough,
+                secondaryTitle: "Not now",
+                onSecondary: {
+                    notesSyncEnabled = false
+                    advanceWalkthrough()
+                }
+            )
+
         case .setup:
             WalkthroughCard(
                 step: step,
                 icon: showSetup ? "checkmark" : "gearshape",
                 title: showSetup ? "You're ready" : "Setup is always available",
                 message: showSetup
-                    ? "You can replay this walkthrough from the top of Setup at any time."
-                    : "Open Setup to customize appearance, naming, glossary terms, and Enhance templates.",
+                    ? "You can replay this walkthrough from the top of Setup at any time. Notch and Apple Notes can be changed there too."
+                    : "Open Setup to customize the notch, Apple Notes, appearance, naming, glossary terms, and Enhance templates.",
                 primaryTitle: showSetup ? "Done" : "Open Setup",
                 onPrimary: showSetup ? completeWalkthrough : openSetup,
                 onSkip: completeWalkthrough

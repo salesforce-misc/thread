@@ -22,6 +22,8 @@ enum WalkthroughStep: Int, CaseIterable {
     case start
     case notesAndEnhance
     case chat
+    case notch
+    case appleNotes
     case setup
 
     var position: Int { rawValue + 1 }
@@ -36,6 +38,8 @@ struct WalkthroughCard: View {
     var primaryDisabled = false
     let onPrimary: () -> Void
     let onSkip: () -> Void
+    var secondaryTitle: String? = nil
+    var onSecondary: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 14) {
@@ -63,6 +67,13 @@ struct WalkthroughCard: View {
                 .buttonStyle(.plain)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
+
+            if let secondaryTitle, let onSecondary {
+                Button(secondaryTitle, action: onSecondary)
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
 
             if let primaryTitle {
                 Button(primaryTitle, action: onPrimary)
