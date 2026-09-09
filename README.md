@@ -1,5 +1,7 @@
 # Thread
 
+For any feedback or comments, please connect with me on [LinkedIn](https://www.linkedin.com/in/jamesarthurbarker/) or email me at [james.barker@salesforce.com](mailto:james.barker@salesforce.com).
+
 ![Thread running a local meeting transcript on macOS](assets/thread-app.gif)
 
 Thread is a private meeting companion for macOS. Start it before a call and it listens, transcribes the conversation live, and helps you turn it into clean notes, summaries, and follow-ups — without anything ever leaving your Mac.
