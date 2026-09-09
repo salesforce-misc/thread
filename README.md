@@ -4,9 +4,9 @@ For any feedback or comments, please connect with me on [LinkedIn](https://www.l
 
 ![Thread running a local meeting transcript on macOS](assets/thread-app.gif)
 
-Thread is a private meeting companion for macOS. Start it before a call and it listens, transcribes the conversation live, and helps you turn it into clean notes, summaries, and follow-ups — without anything ever leaving your Mac.
+Thread is a private meeting companion for macOS. Start it before a call and it listens, transcribes the conversation live, and helps you turn it into clean notes, summaries, and follow-ups. By default, nothing leaves your Mac.
 
-Everything runs locally on your device. There's no account, no sign-up, and no cloud: your meetings, notes, and transcripts stay entirely on your Mac, even offline.
+There's no account and no sign-up. Meetings, notes, and transcripts stay on your Mac unless you optionally bring your own API keys in Setup.
 
 Sessions are plain Markdown files in folders you choose, so your notes stay readable, greppable, and yours.
 
@@ -21,7 +21,8 @@ Open the `.dmg` and drag **Thread** to your Applications folder. The build is no
 ## Features
 
 - **Live transcription** — Captures both your voice and everyone else on the call, transcribed in real time as you talk.
-- **Private & offline** — 100% on-device. No account, no internet required, and nothing is ever uploaded.
+- **Private & offline** — On-device by default. No account, and nothing is uploaded unless you turn on Bring Your Own Keys.
+- **Bring Your Own Keys** — Optional. Use your own OpenAI or Anthropic API key for Enhance and Ask, and OpenAI for live transcription. Off by default.
 - **Rich notes** — Take formatted notes right next to the transcript, with the keyboard shortcuts you already know.
 - **AI Enhance** — Turns rough notes into a clean, structured summary — overview, key points, decisions, and action items — automatically when you stop recording, or any time you ask.
 - **Ask your notes** — Chat with your meetings. Ask questions across everything you've captured and get answers drawn from your own notes and transcripts.
@@ -49,6 +50,8 @@ Open the `.dmg` and drag **Thread** to your Applications folder. The build is no
 
 **Ask.** A chat over your notes, scoped to one note or your whole library. Notes are chunked and embedded with `NLEmbedding` for semantic retrieval, and the model has tools to search passages, read or summarise a specific note, summarise a topic across many notes, and list or tick off tasks. Answers cite the notes they came from. Asking about a single note is a one-off conversation held in memory — only the transcript and your notes are written to the `.md` file.
 
+**Bring Your Own Keys.** Off by default. When enabled, Enhance and Ask can call OpenAI or Anthropic with a key stored in the Mac Keychain, and live transcription can call OpenAI instead of on-device speech. Audio and notes then go to the provider you chose, billed to your account.
+
 **Learned glossary.** When Enhance sees that your notes spell a name or term differently from the transcript, it proposes a correction. Accepted terms persist per-user in Application Support and are applied to future transcripts, so Thread learns your jargon and your colleagues' names.
 
 **Rich text notes.** A Markdown-backed editor with headings, bold/italic/strikethrough, links, bullet and numbered lists, and checkbox tasks, driven by the Format menu and the usual shortcuts.
@@ -60,7 +63,7 @@ Open the `.dmg` and drag **Thread** to your Applications folder. The build is no
 ## Requirements
 
 - **macOS 26 (Tahoe) or later.** Thread is built on frameworks that ship with macOS 26: `FoundationModels` for the on-device LLM, `SpeechAnalyzer`/`SpeechTranscriber` for streaming speech recognition, and Liquid Glass for the UI.
-- **An Apple Intelligence–capable Mac** (Apple silicon, M1 or later). Note enhancement and Ask depend on the system language model; transcription and note-taking work without it.
+- **An Apple Intelligence–capable Mac** (Apple silicon, M1 or later) for on-device Enhance and Ask. Transcription and note-taking work without it. Bring Your Own Keys can run Enhance and Ask through OpenAI or Anthropic instead.
 - **Xcode 26** with a Developer ID certificate if you intend to build signed releases.
 - **Google Chrome** for automatic meeting detection. Recording works from any source, but detection reads Chrome's tabs.
 
@@ -105,6 +108,10 @@ You pick one or more library folders; each becomes a section in the sidebar. If 
 | `Thread/SpeakerVisionMonitor.swift` | Active-speaker attribution from the accessibility tree |
 | `Thread/MeetAccessibilityProbe.swift` | DEBUG-only accessibility-tree dumper for finding each provider's markup |
 | `Thread/AIEngine.swift` | Enhance, Ask, embeddings, and the model's tools |
+| `Thread/BringYourOwnLLM.swift` | Setup: Bring Your Own Keys, Keychain storage, key verify |
+| `Thread/OpenAIChat.swift` | OpenAI Chat Completions for Enhance and Ask |
+| `Thread/ClaudeChat.swift` | Anthropic Messages API for Enhance and Ask |
+| `Thread/OpenAITranscription.swift` | Optional OpenAI live transcription |
 | `Thread/Glossary.swift` | Learned vocabulary and transcript correction |
 | `Thread/SessionStore.swift` | Library folders, Markdown read/write, autosave |
 | `Thread/NotesSync.swift` | Optional one-way copy of a session into Apple Notes |
@@ -156,9 +163,11 @@ The EdDSA private key that signs each update lives in your keychain and is never
 
 ## Privacy
 
-Everything runs locally. Speech recognition uses on-device models, note enhancement and Ask use Apple's on-device foundation model, and embeddings come from `NaturalLanguage`. The app contains no networking code of its own.
+By default everything runs locally. Speech recognition uses on-device models, note enhancement and Ask use Apple's on-device foundation model, and embeddings come from `NaturalLanguage`.
 
-Two things do reach the network, neither carrying your content: macOS downloads the speech recognition model assets from Apple the first time you record in a new language, and Sparkle fetches the appcast to check for updates. Your audio, transcripts, and notes never leave your Mac.
+Two things always reach the network, neither carrying your content: macOS downloads the speech recognition model assets from Apple the first time you record in a new language, and Sparkle fetches the appcast to check for updates.
+
+If you turn on **Bring Your Own Keys**, notes and/or audio are sent to OpenAI or Anthropic using a key you paste. That usage is billed to your account. Keys are stored in the Mac Keychain; removing one from Thread does not revoke it at the provider. With both toggles off, your audio, transcripts, and notes never leave your Mac.
 
 ## Third-party software
 

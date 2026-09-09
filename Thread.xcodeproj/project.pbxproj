@@ -9,10 +9,13 @@
 /* Begin PBXBuildFile section */
 		0A6A76368F5E3DB3A7FB0A98 /* MeetingDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD70667AD50EF45C061320C1 /* MeetingDetector.swift */; };
 		2774DC0F698E50BE88CD703D /* AudioCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12C059C0BD7D4F18AC7A9532 /* AudioCaptureController.swift */; };
+		34EFF290E7DE90D03C304A6D /* OpenAITranscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF1FA54C43F2BCFD88B9B212 /* OpenAITranscription.swift */; };
 		365E2768224C71A8E3CD7B6C /* SpeakerVisionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE6FE5B2352353CAD96D0390 /* SpeakerVisionMonitor.swift */; };
 		3852E8124C309D44401A5BCC /* ThreadApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D208D015765D65C9C34BB8E4 /* ThreadApp.swift */; };
 		5350BDA0C9E96363E708CEE4 /* VisualEffectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7CFE572283F0C2EA6702957 /* VisualEffectView.swift */; };
 		5EDAAF59B4601CE34F14B7D8 /* Glossary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C3EF744137E5940F8F4B66C /* Glossary.swift */; };
+		6BF42CA3CC76DC34CF810C50 /* BringYourOwnLLM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288DF50DB185D64BC2E97206 /* BringYourOwnLLM.swift */; };
+		7499A3EB6574AE96D5E0C74F /* ClaudeChat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E4FA17B29FD5F6090686DB2 /* ClaudeChat.swift */; };
 		79CE5601AC8C8C57E305A88E /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 2C07AB6B1D1A921A43B7084E /* Sparkle */; };
 		85E9FE44FF1D6EACD79F6CDE /* MeetAccessibilityProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C42E9A70B0CD5F903B2E22F /* MeetAccessibilityProbe.swift */; };
 		8BCBC5F05A7F9703D3301283 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9AC76C042E09903C7B227310 /* Assets.xcassets */; };
@@ -23,6 +26,7 @@
 		C6B69A2EF6C6C552D5287B54 /* MeetingTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C418A9FC699A0E64C87E868 /* MeetingTranscriber.swift */; };
 		CAD8B3525814ACDEC185A371 /* THIRD-PARTY-NOTICES.md in Resources */ = {isa = PBXBuildFile; fileRef = DB754C2DAFC6BD76B3EC0D40 /* THIRD-PARTY-NOTICES.md */; };
 		D1592D65FD2F4C754E5539A1 /* Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9EFF1428E6521EC06E64C86 /* Search.swift */; };
+		E43BF9AB58B34334A3D551B7 /* OpenAIChat.swift in Sources */ = {isa = PBXBuildFile; fileRef = E741243A58F98CAA9FBA76C3 /* OpenAIChat.swift */; };
 		E82BEF8F0CDA204E898C2497 /* GoogleMeetMuteMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 895FE8990722EDB93592022A /* GoogleMeetMuteMonitor.swift */; };
 		E831CCA1462E03E0E3FAAB9F /* RichTextNotes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51307C330BFB633E0532705D /* RichTextNotes.swift */; };
 		EFFDCE5552736E1682C6731D /* NotesSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9A26383C34462B53DED7766 /* NotesSync.swift */; };
@@ -33,6 +37,8 @@
 /* Begin PBXFileReference section */
 		09318E1EF0B533DE813A4348 /* Notch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notch.swift; sourceTree = "<group>"; };
 		12C059C0BD7D4F18AC7A9532 /* AudioCaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureController.swift; sourceTree = "<group>"; };
+		288DF50DB185D64BC2E97206 /* BringYourOwnLLM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BringYourOwnLLM.swift; sourceTree = "<group>"; };
+		2E4FA17B29FD5F6090686DB2 /* ClaudeChat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeChat.swift; sourceTree = "<group>"; };
 		3C42E9A70B0CD5F903B2E22F /* MeetAccessibilityProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetAccessibilityProbe.swift; sourceTree = "<group>"; };
 		4C418A9FC699A0E64C87E868 /* MeetingTranscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingTranscriber.swift; sourceTree = "<group>"; };
 		51307C330BFB633E0532705D /* RichTextNotes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextNotes.swift; sourceTree = "<group>"; };
@@ -46,6 +52,7 @@
 		9AC76C042E09903C7B227310 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A41D77566E56D9CA64F02145 /* AIEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIEngine.swift; sourceTree = "<group>"; };
 		A9A26383C34462B53DED7766 /* NotesSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesSync.swift; sourceTree = "<group>"; };
+		AF1FA54C43F2BCFD88B9B212 /* OpenAITranscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAITranscription.swift; sourceTree = "<group>"; };
 		B8F918EB937704BF744CA122 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		C7CFE572283F0C2EA6702957 /* VisualEffectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectView.swift; sourceTree = "<group>"; };
 		CA28B18B12EB03C3F0529920 /* Thread.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Thread.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -53,6 +60,7 @@
 		DB754C2DAFC6BD76B3EC0D40 /* THIRD-PARTY-NOTICES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "THIRD-PARTY-NOTICES.md"; sourceTree = "<group>"; };
 		DD70667AD50EF45C061320C1 /* MeetingDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingDetector.swift; sourceTree = "<group>"; };
 		DE6FE5B2352353CAD96D0390 /* SpeakerVisionMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeakerVisionMonitor.swift; sourceTree = "<group>"; };
+		E741243A58F98CAA9FBA76C3 /* OpenAIChat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIChat.swift; sourceTree = "<group>"; };
 		F9EFF1428E6521EC06E64C86 /* Search.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Search.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -74,6 +82,8 @@
 				A41D77566E56D9CA64F02145 /* AIEngine.swift */,
 				9AC76C042E09903C7B227310 /* Assets.xcassets */,
 				12C059C0BD7D4F18AC7A9532 /* AudioCaptureController.swift */,
+				288DF50DB185D64BC2E97206 /* BringYourOwnLLM.swift */,
+				2E4FA17B29FD5F6090686DB2 /* ClaudeChat.swift */,
 				93D98FFA2FE6B81DD9B25571 /* CMSampleBuffer+PCM.swift */,
 				7AF452E7A165A7C2D07881CA /* ContentView.swift */,
 				6C3EF744137E5940F8F4B66C /* Glossary.swift */,
@@ -84,6 +94,8 @@
 				4C418A9FC699A0E64C87E868 /* MeetingTranscriber.swift */,
 				09318E1EF0B533DE813A4348 /* Notch.swift */,
 				A9A26383C34462B53DED7766 /* NotesSync.swift */,
+				E741243A58F98CAA9FBA76C3 /* OpenAIChat.swift */,
+				AF1FA54C43F2BCFD88B9B212 /* OpenAITranscription.swift */,
 				51307C330BFB633E0532705D /* RichTextNotes.swift */,
 				F9EFF1428E6521EC06E64C86 /* Search.swift */,
 				B8F918EB937704BF744CA122 /* SessionStore.swift */,
@@ -192,7 +204,9 @@
 			files = (
 				93A4DB4D15FFA6885152FB3E /* AIEngine.swift in Sources */,
 				2774DC0F698E50BE88CD703D /* AudioCaptureController.swift in Sources */,
+				6BF42CA3CC76DC34CF810C50 /* BringYourOwnLLM.swift in Sources */,
 				F668F5D7D0940800FDA522B3 /* CMSampleBuffer+PCM.swift in Sources */,
+				7499A3EB6574AE96D5E0C74F /* ClaudeChat.swift in Sources */,
 				AF2F9D7349D2B394B6E4C88D /* ContentView.swift in Sources */,
 				5EDAAF59B4601CE34F14B7D8 /* Glossary.swift in Sources */,
 				E82BEF8F0CDA204E898C2497 /* GoogleMeetMuteMonitor.swift in Sources */,
@@ -201,6 +215,8 @@
 				C6B69A2EF6C6C552D5287B54 /* MeetingTranscriber.swift in Sources */,
 				957EA31F1AE6828C9CE4F9B8 /* Notch.swift in Sources */,
 				EFFDCE5552736E1682C6731D /* NotesSync.swift in Sources */,
+				E43BF9AB58B34334A3D551B7 /* OpenAIChat.swift in Sources */,
+				34EFF290E7DE90D03C304A6D /* OpenAITranscription.swift in Sources */,
 				E831CCA1462E03E0E3FAAB9F /* RichTextNotes.swift in Sources */,
 				D1592D65FD2F4C754E5539A1 /* Search.swift in Sources */,
 				FE2C1AC9E026FC6586FCACA3 /* SessionStore.swift in Sources */,
@@ -248,7 +264,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 100;
+				CURRENT_PROJECT_VERSION = 101;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -268,7 +284,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0.00;
+				MARKETING_VERSION = 1.0.01;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -314,7 +330,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 100;
+				CURRENT_PROJECT_VERSION = 101;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -328,7 +344,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0.00;
+				MARKETING_VERSION = 1.0.01;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

@@ -561,7 +561,8 @@ struct NotchView: View {
                 ScrollView {
                     Text(model.errorText ?? model.answer)
                         .font(.system(size: 12))
-                        .foregroundStyle(model.errorText != nil ? .secondary : .primary)
+                        .foregroundStyle(model.errorText != nil
+                                         ? Color(nsColor: .systemRed) : .primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
                 }

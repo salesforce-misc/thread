@@ -254,13 +254,29 @@ final class AskEngine: ObservableObject {
     private var rebuildGeneration = UUID()
     /// Held so the on-device model stays resident after prewarming.
     private var prewarmSession: LanguageModelSession?
+    private var llmSettingsObserver: NSObjectProtocol?
 
-    init() { refreshAvailability() }
+    init() {
+        refreshAvailability()
+        llmSettingsObserver = NotificationCenter.default.addObserver(
+            forName: .threadLLMSettingsDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.refreshAvailability()
+        }
+    }
+
+    deinit {
+        if let llmSettingsObserver {
+            NotificationCenter.default.removeObserver(llmSettingsObserver)
+        }
+    }
 
     /// Warms the on-device model so the first enhance/ask isn't a cold start
     /// (which otherwise loads several GB of weights and can take many seconds).
     func prewarm() {
-        guard isAvailable else { return }
+        guard isAvailable, !LLMRouting.usesCloud else { return }
         if prewarmSession == nil {
             prewarmSession = LanguageModelSession(instructions: Self.enhanceInstructions)
         }
@@ -270,13 +286,22 @@ final class AskEngine: ObservableObject {
     // MARK: - Availability
 
     func refreshAvailability() {
+        if LLMRouting.usesCloud {
+            isAvailable = true
+            unavailableReason = nil
+            return
+        }
         switch SystemLanguageModel.default.availability {
         case .available:
             isAvailable = true
             unavailableReason = nil
         case .unavailable(let reason):
             isAvailable = false
-            unavailableReason = Self.describe(reason)
+            if UserDefaults.standard.bool(forKey: AppSettings.bringYourOwnLLMEnabledKey) {
+                unavailableReason = "Paste an API key in Setup, or turn on Apple Intelligence."
+            } else {
+                unavailableReason = Self.describe(reason)
+            }
         }
     }
 
@@ -291,6 +316,88 @@ final class AskEngine: ObservableObject {
         @unknown default:
             return "On-device AI is currently unavailable."
         }
+    }
+
+    /// Streams cumulative text from OpenAI, Claude, or Apple Intelligence.
+    private func streamModel(
+        instructions: String,
+        prompt: String,
+        maxTokens: Int,
+        timeout: TimeInterval,
+        onPartial: @MainActor @escaping (String) -> Void
+    ) async -> String {
+        if LLMRouting.usesCloud {
+            var last = ""
+            let start = Date()
+            do {
+                for try await cumulative in CloudLLM.stream(
+                    key: LLMRouting.apiKey,
+                    instructions: instructions,
+                    prompt: prompt,
+                    maxTokens: maxTokens
+                ) {
+                    if Task.isCancelled { break }
+                    last = cumulative
+                    await MainActor.run { onPartial(last) }
+                    if Date().timeIntervalSince(start) > timeout { break }
+                }
+                if last.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    LLMRouting.noteGenerationFailure(OpenAIChatError.empty)
+                } else {
+                    LLMRouting.clearGenerationFailure()
+                }
+            } catch is CancellationError {
+                return last
+            } catch {
+                LLMRouting.noteGenerationFailure(error)
+                return ""
+            }
+            return last
+        }
+
+        let session = LanguageModelSession(instructions: instructions)
+        let options = GenerationOptions(maximumResponseTokens: maxTokens)
+        var last = ""
+        let start = Date()
+        do {
+            let stream = session.streamResponse(to: prompt, options: options)
+            for try await snapshot in stream {
+                if Task.isCancelled { break }
+                last = snapshot.content
+                let partial = last
+                await MainActor.run { onPartial(partial) }
+                if Date().timeIntervalSince(start) > timeout { break }
+            }
+        } catch {
+            #if DEBUG
+            NSLog("[apple-llm] stream failed: %@", error.localizedDescription)
+            #endif
+        }
+        return last
+    }
+
+    fileprivate func completeModel(
+        instructions: String,
+        prompt: String,
+        maxTokens: Int
+    ) async -> String? {
+        if LLMRouting.usesCloud {
+            let text = try? await CloudLLM.complete(
+                key: LLMRouting.apiKey,
+                instructions: instructions,
+                prompt: prompt,
+                maxTokens: maxTokens
+            )
+            let out = text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return out.isEmpty ? nil : out
+        }
+        let session = LanguageModelSession(instructions: instructions)
+        let options = GenerationOptions(maximumResponseTokens: maxTokens)
+        guard let response = try? await session.respond(to: prompt, options: options) else {
+            return nil
+        }
+        let out = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        return out.isEmpty ? nil : out
     }
 
     // MARK: - Indexing
@@ -402,6 +509,10 @@ final class AskEngine: ObservableObject {
             return NoteRef(url: url, title: title)
         }()
 
+        let useCloud = LLMRouting.usesCloud
+        let cloudKey = LLMRouting.apiKey
+        let askInstructions = Self.instructions(currentTitle: currentTitle)
+
         return AsyncStream { continuation in
             let task = Task {
                 guard available else {
@@ -410,50 +521,85 @@ final class AskEngine: ObservableObject {
                     return
                 }
                 let sink = SourceSink()
-                let tools: [any Tool] = [
-                    SearchNotesTool(
-                        chunks: scopedChunks,
-                        model: retrievalModel,
-                        sink: sink
-                    ),
-                    SummarizeTopicTool(
-                        chunks: scopedChunks,
-                        model: retrievalModel,
-                        sink: sink
-                    ),
-                    ReadNoteTool(refs: refs, sink: sink),
-                    SummarizeNoteTool(refs: refs, sink: sink),
-                    ListTasksTool(refs: refs, current: currentRef, sink: sink),
-                    SetTaskDoneTool(refs: refs, current: currentRef, sink: sink),
-                ]
-                let session = LanguageModelSession(tools: tools,
-                                                   instructions: Self.instructions(currentTitle: currentTitle))
+                let search = SearchNotesTool(
+                    chunks: scopedChunks,
+                    model: retrievalModel,
+                    sink: sink
+                )
+                let topic = SummarizeTopicTool(
+                    chunks: scopedChunks,
+                    model: retrievalModel,
+                    sink: sink
+                )
+                let read = ReadNoteTool(refs: refs, sink: sink)
+                let summarize = SummarizeNoteTool(refs: refs, sink: sink)
+                let list = ListTasksTool(refs: refs, current: currentRef, sink: sink)
+                let setDone = SetTaskDoneTool(refs: refs, current: currentRef, sink: sink)
                 var lastSourceCount = 0
+                func emitSources() {
+                    let current = sink.snapshot()
+                    if current.count != lastSourceCount {
+                        lastSourceCount = current.count
+                        continuation.yield(.sources(current))
+                    }
+                }
                 do {
-                    let stream = session.streamResponse(to: query)
-                    for try await snapshot in stream {
-                        if Task.isCancelled { break }
-                        continuation.yield(.answer(snapshot.content))
-                        let current = sink.snapshot()
-                        if current.count != lastSourceCount {
-                            lastSourceCount = current.count
-                            continuation.yield(.sources(current))
+                    if useCloud {
+                        try await CloudLLM.runToolConversation(
+                            key: cloudKey,
+                            instructions: askInstructions,
+                            user: query,
+                            tools: OpenAIAskTools.libraryDefinitions,
+                            maxTokens: 800
+                        ) { name, arguments in
+                            try await OpenAIAskTools.execute(
+                                name: name,
+                                arguments: arguments,
+                                search: search,
+                                topic: topic,
+                                read: read,
+                                summarize: summarize,
+                                list: list,
+                                setDone: setDone
+                            )
+                        } onText: { cumulative in
+                            continuation.yield(.answer(cumulative))
+                            emitSources()
+                        }
+                        LLMRouting.clearGenerationFailure()
+                    } else {
+                        let session = LanguageModelSession(
+                            tools: [search, topic, read, summarize, list, setDone],
+                            instructions: askInstructions
+                        )
+                        let stream = session.streamResponse(to: query)
+                        for try await snapshot in stream {
+                            if Task.isCancelled { break }
+                            continuation.yield(.answer(snapshot.content))
+                            emitSources()
                         }
                     }
-                    let finalSources = sink.snapshot()
-                    if finalSources.count != lastSourceCount {
-                        continuation.yield(.sources(finalSources))
-                    }
+                    emitSources()
+                } catch is CancellationError {
+                    continuation.finish()
+                    return
                 } catch {
                     #if DEBUG
                     NSLog("[ask] generation failed: %@", error.localizedDescription)
                     #endif
-                    continuation.yield(
-                        .failed(
-                            "Couldn't complete that request. Try asking about "
+                    if LLMRouting.usesCloud {
+                        LLMRouting.noteGenerationFailure(error)
+                        continuation.yield(.failed(CloudLLM.setupHint))
+                    } else {
+                        let message: String
+                        if let openai = error as? OpenAIChatError {
+                            message = openai.localizedDescription
+                        } else {
+                            message = "Couldn't complete that request. Try asking about "
                                 + "the topic again or select a specific note."
-                        )
-                    )
+                        }
+                        continuation.yield(.failed(message))
+                    }
                 }
                 continuation.finish()
             }
@@ -484,7 +630,9 @@ final class AskEngine: ObservableObject {
     /// the next turn is diffed against, so a meeting in progress is handed over as
     /// the lines that have landed since rather than in full every time.
     private struct NoteConversation {
-        let session: LanguageModelSession
+        var appleSession: LanguageModelSession?
+        var openAIMessages: [OpenAIChat.Message]?
+        var isResponding = false
         var sentNotes: String?
         var sentTranscript: String?
     }
@@ -510,24 +658,36 @@ final class AskEngine: ObservableObject {
                 // conversation and asks again with the whole note as evidence.
                 for attempt in 0...1 {
                     if Task.isCancelled { break }
-                    let convo = conversation(for: note)
+                    var convo = conversation(for: note)
                     let prompt = await Self.notePrompt(query: query, evidence: evidence,
                                                        sentNotes: convo.sentNotes,
                                                        sentTranscript: convo.sentTranscript)
                     markSent(evidence, for: note)
-                    // A session answers one question at a time, and the previous
-                    // stream may still be winding down from a cancel. Give it a beat
-                    // rather than throwing this question away.
                     var waited = 0
-                    while convo.session.isResponding, waited < 40, !Task.isCancelled {
+                    while convo.isResponding, waited < 40, !Task.isCancelled {
                         try? await Task.sleep(for: .milliseconds(50))
                         waited += 1
+                        convo = conversation(for: note)
                     }
+                    markResponding(true, for: note)
+                    defer { markResponding(false, for: note) }
                     do {
-                        for try await snapshot in convo.session.streamResponse(to: prompt) {
-                            if Task.isCancelled { break }
-                            continuation.yield(.answer(snapshot.content))
+                        if LLMRouting.usesCloud {
+                            try await streamCloudNote(
+                                query: prompt,
+                                note: note,
+                                into: continuation
+                            )
+                        } else if let session = convo.appleSession {
+                            for try await snapshot in session.streamResponse(to: prompt) {
+                                if Task.isCancelled { break }
+                                continuation.yield(.answer(snapshot.content))
+                            }
+                        } else {
+                            throw OpenAIChatError.empty
                         }
+                        break
+                    } catch is CancellationError {
                         break
                     } catch {
                         #if DEBUG
@@ -536,9 +696,18 @@ final class AskEngine: ObservableObject {
                         #endif
                         noteConversations[note] = nil
                         if attempt == 1 && !Task.isCancelled {
-                            continuation.yield(
-                                .failed("Couldn't answer that one. Try asking again.")
-                            )
+                            if LLMRouting.usesCloud {
+                                LLMRouting.noteGenerationFailure(error)
+                                continuation.yield(.failed(CloudLLM.setupHint))
+                            } else {
+                                let message: String
+                                if let openai = error as? OpenAIChatError {
+                                    message = openai.localizedDescription
+                                } else {
+                                    message = "Couldn't answer that one. Try asking again."
+                                }
+                                continuation.yield(.failed(message))
+                            }
                         }
                     }
                 }
@@ -560,21 +729,29 @@ final class AskEngine: ObservableObject {
     }
 
     private func conversation(for note: URL) -> NoteConversation {
-        if let existing = noteConversations[note] { return existing }
+        if let existing = noteConversations[note] {
+            if LLMRouting.usesCloud, existing.openAIMessages != nil { return existing }
+            if !LLMRouting.usesCloud, existing.appleSession != nil { return existing }
+            noteConversations[note] = nil
+        }
         let ref = NoteRef(url: note, title: note.deletingPathExtension().lastPathComponent)
         // No retrieval tools: the note's text is handed over directly, so search
         // would only offer a staler copy of what the model already has. The task
         // tools stay because they act on the file rather than describe it.
         let sink = SourceSink()
-        let convo = NoteConversation(
-            session: LanguageModelSession(
-                tools: [
-                    ListTasksTool(refs: [ref], current: ref, sink: sink),
-                    SetTaskDoneTool(refs: [ref], current: ref, sink: sink),
-                ],
+        let list = ListTasksTool(refs: [ref], current: ref, sink: sink)
+        let setDone = SetTaskDoneTool(refs: [ref], current: ref, sink: sink)
+        var convo = NoteConversation()
+        if LLMRouting.usesCloud {
+            convo.openAIMessages = [
+                OpenAIChat.Message(role: "system", content: Self.noteInstructions)
+            ]
+        } else {
+            convo.appleSession = LanguageModelSession(
+                tools: [list, setDone],
                 instructions: Self.noteInstructions
             )
-        )
+        }
         noteConversations[note] = convo
         return convo
     }
@@ -584,6 +761,50 @@ final class AskEngine: ObservableObject {
         convo.sentNotes = evidence.notes
         convo.sentTranscript = evidence.transcript
         noteConversations[note] = convo
+    }
+
+    private func markResponding(_ value: Bool, for note: URL) {
+        guard var convo = noteConversations[note] else { return }
+        convo.isResponding = value
+        noteConversations[note] = convo
+    }
+
+    private func streamCloudNote(
+        query: String,
+        note: URL,
+        into continuation: AsyncStream<AskEvent>.Continuation
+    ) async throws {
+        let ref = NoteRef(url: note, title: note.deletingPathExtension().lastPathComponent)
+        let sink = SourceSink()
+        let list = ListTasksTool(refs: [ref], current: ref, sink: sink)
+        let setDone = SetTaskDoneTool(refs: [ref], current: ref, sink: sink)
+        var messages = noteConversations[note]?.openAIMessages
+            ?? [OpenAIChat.Message(role: "system", content: Self.noteInstructions)]
+        messages.append(OpenAIChat.Message(role: "user", content: query))
+        let updated = try await CloudLLM.runToolConversation(
+            key: LLMRouting.apiKey,
+            messages: messages,
+            tools: OpenAIAskTools.noteDefinitions,
+            maxTokens: 700
+        ) { name, arguments in
+            try await OpenAIAskTools.execute(
+                name: name,
+                arguments: arguments,
+                search: nil,
+                topic: nil,
+                read: nil,
+                summarize: nil,
+                list: list,
+                setDone: setDone
+            )
+        } onText: { cumulative in
+            continuation.yield(.answer(cumulative))
+        }
+        LLMRouting.clearGenerationFailure()
+        if var convo = noteConversations[note] {
+            convo.openAIMessages = updated
+            noteConversations[note] = convo
+        }
     }
 
     /// The opening turn carries the note in full; later turns carry only what has
@@ -760,25 +981,13 @@ final class AskEngine: ObservableObject {
         \(context.text.isEmpty ? "(none)" : context.text)
         """
 
-        let session = LanguageModelSession(instructions: Self.enhanceInstructions)
-        // Cap the response so the model can't run away generating filler; keeps
-        // the whole enhance bounded and fast.
-        let options = GenerationOptions(maximumResponseTokens: 900)
-        var last = ""
-        let start = Date()
-        do {
-            let stream = session.streamResponse(to: prompt, options: options)
-            for try await snapshot in stream {
-                if Task.isCancelled { break }
-                last = snapshot.content
-                let partial = last
-                await MainActor.run { onPartial(partial) }
-                // Safety valve: never let a wedged stream spin forever.
-                if Date().timeIntervalSince(start) > 180 { break }
-            }
-        } catch {
-            if last.isEmpty { return nil }
-        }
+        let last = await streamModel(
+            instructions: Self.enhanceInstructions,
+            prompt: prompt,
+            maxTokens: LLMRouting.usesCloud ? 1600 : 900,
+            timeout: 180,
+            onPartial: onPartial
+        )
         let notesOutput = last.trimmingCharacters(in: .whitespacesAndNewlines)
         // Never let a task-only/empty model response erase the user's notes.
         guard !notesOutput.isEmpty else { return nil }
@@ -823,23 +1032,13 @@ final class AskEngine: ObservableObject {
         \(anchor)
         """
 
-        let session = LanguageModelSession(instructions: Self.enhanceBlockInstructions)
-        // Bounded so an expansion can add a few bullets but never run away.
-        let options = GenerationOptions(maximumResponseTokens: 500)
-        var last = ""
-        let start = Date()
-        do {
-            let stream = session.streamResponse(to: prompt, options: options)
-            for try await snapshot in stream {
-                if Task.isCancelled { break }
-                last = snapshot.content
-                let partial = last
-                await MainActor.run { onPartial(partial) }
-                if Date().timeIntervalSince(start) > 120 { break }
-            }
-        } catch {
-            if last.isEmpty { return nil }
-        }
+        let last = await streamModel(
+            instructions: Self.enhanceBlockInstructions,
+            prompt: prompt,
+            maxTokens: LLMRouting.usesCloud ? 800 : 500,
+            timeout: 120,
+            onPartial: onPartial
+        )
         let out = last.trimmingCharacters(in: .whitespacesAndNewlines)
         return out.isEmpty ? nil : out
     }
@@ -852,37 +1051,56 @@ final class AskEngine: ObservableObject {
         let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !body.isEmpty else { return nil }
         let input = await Self.condense(transcript: body).text
-        let sub = LanguageModelSession(instructions:
-            "Summarize this segment of a meeting transcript in 3–5 sentences, focusing on decisions, key topics, and action items. Be factual and concise. Do not introduce any names or attributions that are not present verbatim in the text; do not invent anything.")
-        let options = GenerationOptions(maximumResponseTokens: 260)
-        guard let r = try? await sub.respond(to: input, options: options) else { return nil }
-        let out = r.content.trimmingCharacters(in: .whitespacesAndNewlines)
-        return out.isEmpty ? nil : out
+        guard let out = await completeModel(
+            instructions:
+                "Summarize this segment of a meeting transcript in 3–5 sentences, focusing on decisions, key topics, and action items. Be factual and concise. Do not introduce any names or attributions that are not present verbatim in the text; do not invent anything.",
+            prompt: input,
+            maxTokens: 260
+        ) else { return nil }
+        return out
     }
 
     /// Condenses a transcript to fit the window: short ones pass through, long
-    /// ones are summarized section-by-section first. Larger chunks mean fewer
-    /// summarization round-trips, which is the main enhance latency win.
+    /// ones are summarized section-by-section first. Cloud windows are large, so
+    /// typical meetings skip this map-reduce.
     private static func condense(transcript: String) async -> (text: String, summarized: Bool) {
-        let pieces = chunkText(transcript, limit: 6000)
+        let limit = LLMRouting.usesCloud ? 80_000 : 6_000
+        let pieces = chunkText(transcript, limit: limit)
         if pieces.count <= 1 { return (transcript, false) }
-        let sub = LanguageModelSession(instructions:
-            "Summarize this excerpt of a meeting transcript in 2–4 sentences, focusing on decisions, key topics, and action items. Be factual. Do not introduce any names or attributions that are not present verbatim in the text.")
-        let options = GenerationOptions(maximumResponseTokens: 220)
         var partials: [String] = []
         for (i, piece) in pieces.enumerated() {
             if Task.isCancelled { break }
-            guard let r = try? await sub.respond(to: piece, options: options) else { continue }
-            partials.append("Section \(i + 1): \(r.content)")
+            guard let summary = await summarizeExcerpt(piece) else { continue }
+            partials.append("Section \(i + 1): \(summary)")
         }
         return (partials.joined(separator: "\n"), true)
+    }
+
+    fileprivate static func summarizeExcerpt(_ piece: String) async -> String? {
+        let instructions =
+            "Summarize this excerpt of a meeting transcript in 2–4 sentences, focusing on decisions, key topics, and action items. Be factual. Do not introduce any names or attributions that are not present verbatim in the text."
+        if LLMRouting.usesCloud {
+            let text = try? await CloudLLM.complete(
+                key: LLMRouting.apiKey,
+                instructions: instructions,
+                prompt: piece,
+                maxTokens: 220
+            )
+            let out = text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return out.isEmpty ? nil : out
+        }
+        let sub = LanguageModelSession(instructions: instructions)
+        let options = GenerationOptions(maximumResponseTokens: 220)
+        guard let r = try? await sub.respond(to: piece, options: options) else { return nil }
+        let out = r.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        return out.isEmpty ? nil : out
     }
 
     private static func extractActionItems(notes: String,
                                            transcript: String,
                                            groundingText: String,
                                            names: String) async -> [String]? {
-        let session = LanguageModelSession(instructions: """
+        let instructions = """
         Extract concrete action items into the provided structured schema. Tasks \
         may come from EITHER the user's notes or the meeting transcript — the user \
         may have jotted a to-do that was never said aloud, and that is still a \
@@ -897,7 +1115,7 @@ final class AskEngine: ObservableObject {
         If no such name is clearly present, leave the owner empty. Never guess or \
         invent a name — most speakers are unlabeled, so an empty owner is normal \
         and expected.
-        """)
+        """
         let prompt = """
         Names and aliases used for the note-taker:
         \(names.isEmpty ? "(not provided)" : names)
@@ -908,20 +1126,50 @@ final class AskEngine: ObservableObject {
         Meeting evidence:
         \(transcript.isEmpty ? "(none)" : transcript)
         """
-        let options = GenerationOptions(maximumResponseTokens: 400)
-        // Deterministic guard against fabricated owners: a name survives only if
-        // it actually appears in the notes, the transcript, or the aliases. We
-        // keep the task and simply blank an ungrounded owner (a task with no
-        // owner is still valid).
         let gate = (groundingText + "\n" + notes + "\n" + names).lowercased()
         do {
-            let response = try await session.respond(
-                to: prompt,
-                generating: ExtractedActionItems.self,
-                options: options
-            )
+            let items: [(task: String, owner: String)]
+            if LLMRouting.usesCloud {
+                let data = try await CloudLLM.completeJSON(
+                    key: LLMRouting.apiKey,
+                    instructions: instructions,
+                    prompt: prompt,
+                    schemaName: "extracted_action_items",
+                    schema: [
+                        "type": "object",
+                        "properties": [
+                            "items": [
+                                "type": "array",
+                                "items": [
+                                    "type": "object",
+                                    "properties": [
+                                        "task": ["type": "string"],
+                                        "owner": ["type": "string"],
+                                    ],
+                                    "required": ["task", "owner"],
+                                    "additionalProperties": false,
+                                ],
+                            ],
+                        ],
+                        "required": ["items"],
+                        "additionalProperties": false,
+                    ],
+                    maxTokens: 400
+                )
+                let decoded = try JSONDecoder().decode(OpenAIActionItems.self, from: data)
+                items = decoded.items.map { ($0.task, $0.owner) }
+            } else {
+                let session = LanguageModelSession(instructions: instructions)
+                let options = GenerationOptions(maximumResponseTokens: 400)
+                let response = try await session.respond(
+                    to: prompt,
+                    generating: ExtractedActionItems.self,
+                    options: options
+                )
+                items = response.content.items.map { ($0.task, $0.owner) }
+            }
             var seen = Set<String>()
-            return response.content.items.compactMap { item in
+            return items.compactMap { item in
                 let task = item.task.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !task.isEmpty else { return nil }
                 var owner = item.owner.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -934,6 +1182,14 @@ final class AskEngine: ObservableObject {
         } catch {
             return nil
         }
+    }
+
+    private struct OpenAIActionItems: Decodable {
+        struct Item: Decodable {
+            var task: String
+            var owner: String
+        }
+        var items: [Item]
     }
 
     /// True if an extracted owner name actually appears in the grounding corpus
@@ -1240,6 +1496,149 @@ final class AskEngine: ObservableObject {
     }
 }
 
+private enum OpenAIAskTools {
+    private static func stringProperty(_ description: String) -> [String: Any] {
+        ["type": "string", "description": description]
+    }
+
+    private static func objectSchema(
+        properties: [String: Any],
+        required: [String]
+    ) -> [String: Any] {
+        [
+            "type": "object",
+            "properties": properties,
+            "required": required,
+            "additionalProperties": false,
+        ]
+    }
+
+    static let libraryDefinitions: [OpenAIChat.ToolDefinition] = [
+        .init(
+            name: "searchNotes",
+            description: "Search the user's notes and meeting transcripts for passages relevant to a query, returning the most relevant excerpts with source labels.",
+            parameters: objectSchema(
+                properties: ["query": stringProperty("What to look for, phrased as a natural-language query.")],
+                required: ["query"]
+            )
+        ),
+        .init(
+            name: "summarizeTopic",
+            description: "Gather relevant passages about a topic across multiple notes or meetings. Use for requests to summarize everything discussed about a subject. Do not use for a specific note title.",
+            parameters: objectSchema(
+                properties: ["topic": stringProperty("The subject to summarize, written as a short search phrase rather than a note title.")],
+                required: ["topic"]
+            )
+        ),
+        .init(
+            name: "readNote",
+            description: "Read the full text of one specific note by its title. Use for a targeted question about a single, shorter note.",
+            parameters: objectSchema(
+                properties: ["noteTitle": stringProperty("The title (or part of the title) of the note to read.")],
+                required: ["noteTitle"]
+            )
+        ),
+        .init(
+            name: "summarizeNote",
+            description: "Summarize one specific note or meeting identified by its title. Handles long transcripts. Never use for a subject spanning multiple notes; use summarizeTopic for that.",
+            parameters: objectSchema(
+                properties: ["noteTitle": stringProperty("The title (or part of the title) of the note to summarize.")],
+                required: ["noteTitle"]
+            )
+        ),
+        .init(
+            name: "listTasks",
+            description: "List a note's checkbox tasks (open and done) as a numbered list. Reads the actual task list; use this for questions about tasks / what's open / what's left.",
+            parameters: objectSchema(
+                properties: ["noteTitle": stringProperty("The note's title. Leave empty for the note the user is currently viewing.")],
+                required: ["noteTitle"]
+            )
+        ),
+        .init(
+            name: "setTaskDone",
+            description: "Mark a task done or not done by its number (from listTasks). Call listTasks first to get the number.",
+            parameters: objectSchema(
+                properties: [
+                    "noteTitle": stringProperty("The note's title. Leave empty for the note the user is currently viewing."),
+                    "taskNumber": [
+                        "type": "integer",
+                        "description": "The task's 1-based number as shown by listTasks.",
+                    ],
+                    "done": [
+                        "type": "boolean",
+                        "description": "true to mark done, false to reopen it.",
+                    ],
+                ],
+                required: ["noteTitle", "taskNumber", "done"]
+            )
+        ),
+    ]
+
+    static let noteDefinitions: [OpenAIChat.ToolDefinition] = libraryDefinitions.filter {
+        $0.name == "listTasks" || $0.name == "setTaskDone"
+    }
+
+    static func execute(
+        name: String,
+        arguments: String,
+        search: SearchNotesTool?,
+        topic: SummarizeTopicTool?,
+        read: ReadNoteTool?,
+        summarize: SummarizeNoteTool?,
+        list: ListTasksTool?,
+        setDone: SetTaskDoneTool?
+    ) async throws -> String {
+        let data = Data(arguments.utf8)
+        do {
+            switch name {
+            case "searchNotes":
+                guard let search else { return "searchNotes is not available." }
+                let args = try JSONDecoder().decode(QueryArg.self, from: data)
+                return try await search.call(arguments: .init(query: args.query))
+            case "summarizeTopic":
+                guard let topic else { return "summarizeTopic is not available." }
+                let args = try JSONDecoder().decode(TopicArg.self, from: data)
+                return try await topic.call(arguments: .init(topic: args.topic))
+            case "readNote":
+                guard let read else { return "readNote is not available." }
+                let args = try JSONDecoder().decode(TitleArg.self, from: data)
+                return try await read.call(arguments: .init(noteTitle: args.noteTitle ?? ""))
+            case "summarizeNote":
+                guard let summarize else { return "summarizeNote is not available." }
+                let args = try JSONDecoder().decode(TitleArg.self, from: data)
+                return try await summarize.call(arguments: .init(noteTitle: args.noteTitle ?? ""))
+            case "listTasks":
+                guard let list else { return "listTasks is not available." }
+                let args = (try? JSONDecoder().decode(TitleArg.self, from: data)) ?? TitleArg()
+                return try await list.call(arguments: .init(noteTitle: args.noteTitle ?? ""))
+            case "setTaskDone":
+                guard let setDone else { return "setTaskDone is not available." }
+                let args = try JSONDecoder().decode(SetTaskArg.self, from: data)
+                return try await setDone.call(
+                    arguments: .init(
+                        noteTitle: args.noteTitle ?? "",
+                        taskNumber: args.taskNumber,
+                        done: args.done
+                    )
+                )
+            default:
+                return "Unknown tool \(name)."
+            }
+        } catch {
+            return "Couldn't run \(name)."
+        }
+    }
+
+    private struct QueryArg: Decodable { var query: String }
+    private struct TopicArg: Decodable { var topic: String }
+    private struct TitleArg: Decodable { var noteTitle: String? }
+    private struct SetTaskArg: Decodable {
+        var noteTitle: String?
+        var taskNumber: Int
+        var done: Bool
+    }
+}
+
 // MARK: - Tools
 
 /// Semantic search over the (scoped) note index.
@@ -1363,21 +1762,15 @@ private struct SummarizeNoteTool: Tool {
         if pieces.count <= 1 { return text }
 
         // Map: summarize each section; the caller model reduces into a final answer.
-        let sub = LanguageModelSession(instructions:
-            "Summarize this excerpt of a meeting transcript in 2–4 sentences, focusing on decisions, key topics, and action items. Be factual.")
         var partials: [String] = []
         for (i, piece) in pieces.enumerated() {
             if Task.isCancelled { break }
-            do {
-                let response = try await sub.respond(to: piece)
-                partials.append("Section \(i + 1): \(response.content)")
-            } catch {
-                // Keep the tool call alive so one failed map step does not leak
-                // an internal Foundation Models error into the conversation.
-                if !partials.isEmpty {
-                    return "Section summaries of \"\(ref.title)\":\n"
-                        + partials.joined(separator: "\n")
-                }
+            if let summary = await AskEngine.summarizeExcerpt(piece) {
+                partials.append("Section \(i + 1): \(summary)")
+            } else if !partials.isEmpty {
+                return "Section summaries of \"\(ref.title)\":\n"
+                    + partials.joined(separator: "\n")
+            } else {
                 return "Excerpt from \"\(ref.title)\":\n"
                     + String(text.prefix(6_000))
             }

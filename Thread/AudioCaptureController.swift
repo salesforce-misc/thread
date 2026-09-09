@@ -34,9 +34,9 @@ enum Speaker: String {
 /// call from any thread; this just makes swapping/clearing the reference safe.
 final class TranscriberBox: @unchecked Sendable {
     private let lock = NSLock()
-    private var transcriber: MeetingTranscriber?
+    private var transcriber: (any LiveTranscriber)?
 
-    func set(_ value: MeetingTranscriber?) {
+    func set(_ value: (any LiveTranscriber)?) {
         lock.lock(); transcriber = value; lock.unlock()
     }
 
@@ -114,8 +114,8 @@ final class AudioCaptureController: NSObject, ObservableObject {
     private var autosaveTask: Task<Void, Never>?
 
     private let micEngine = AVAudioEngine()
-    private var micTranscriber: MeetingTranscriber?
-    private var systemTranscriber: MeetingTranscriber?
+    private var micTranscriber: (any LiveTranscriber)?
+    private var systemTranscriber: (any LiveTranscriber)?
     private var scStream: SCStream?
 
     // Thread-safe handles the realtime audio callbacks feed WITHOUT hopping to
@@ -370,8 +370,8 @@ final class AudioCaptureController: NSObject, ObservableObject {
     private func makeTranscriber(
         source: TranscriptionSource,
         applying apply: @escaping (String, Bool) -> Void
-    ) async throws -> MeetingTranscriber {
-        let transcriber = MeetingTranscriber(source: source, locale: .current)
+    ) async throws -> any LiveTranscriber {
+        let transcriber = LiveTranscriberFactory.make(source: source)
         transcriber.onUpdate = { [weak self] text, isFinal, resultReceivedUptime in
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -851,6 +851,9 @@ final class AudioCaptureController: NSObject, ObservableObject {
 
     private func requestPermissions() async -> Bool {
         let micGranted = await AVCaptureDevice.requestAccess(for: .audio)
+        if STTRouting.usesOpenAI {
+            return micGranted
+        }
         let speechGranted = await withCheckedContinuation { continuation in
             SFSpeechRecognizer.requestAuthorization { status in
                 continuation.resume(returning: status == .authorized)

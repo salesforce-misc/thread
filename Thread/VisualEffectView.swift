@@ -47,6 +47,16 @@ enum AppSettings {
     static let notesSyncEnabledKey = "notesSync.enabled"
     static let notesSyncAccountKey = "notesSync.account"
     static let notesSyncFolderReadyKey = "notesSync.folderReady"
+    /// Opt-in cloud LLM. Off keeps Enhance and Ask on Apple Intelligence.
+    /// The API key lives in the Keychain, not here.
+    static let bringYourOwnLLMEnabledKey = "llm.bringYourOwn.enabled"
+    static let llmProviderKey = "llm.bringYourOwn.provider"
+    static let llmModelKey = "llm.bringYourOwn.model"
+    static let defaultLLMModel = "gpt-4o-mini"
+    static let defaultClaudeModel = "claude-sonnet-4-6"
+    static let bringYourOwnTranscriptionEnabledKey = "stt.bringYourOwn.enabled"
+    static let transcriptionModelKey = "stt.bringYourOwn.model"
+    static let defaultTranscriptionModel = "gpt-4o-mini-transcribe"
 }
 
 /// Whether Thread follows the system light/dark setting or pins itself to one.

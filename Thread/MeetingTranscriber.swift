@@ -20,10 +20,28 @@ import AVFoundation
 import Speech
 import QuartzCore
 
+/// One live speech engine (Apple or OpenAI). Safe to `feed` from a realtime tap.
+protocol LiveTranscriber: AnyObject {
+    var onUpdate: ((String, Bool, TimeInterval) -> Void)? { get set }
+    var onError: ((Error) -> Void)? { get set }
+    func start() async throws
+    func feed(_ buffer: AVAudioPCMBuffer)
+    func stop() async
+}
+
+enum LiveTranscriberFactory {
+    static func make(source: TranscriptionSource) -> any LiveTranscriber {
+        if STTRouting.usesOpenAI {
+            return OpenAIMeetingTranscriber(source: source)
+        }
+        return MeetingTranscriber(source: source)
+    }
+}
+
 /// Wraps one on-device `SpeechAnalyzer` + `SpeechTranscriber` pipeline for a single
 /// audio stream. Feed it PCM buffers from any thread; it converts them to the
 /// analyzer's preferred format and streams incremental (volatile) + final results.
-final class MeetingTranscriber {
+final class MeetingTranscriber: LiveTranscriber {
 
     enum TranscriberError: LocalizedError {
         case localeNotSupported(String)

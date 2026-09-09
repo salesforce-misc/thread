@@ -697,6 +697,13 @@ struct ContentView: View {
                     .strokeBorder(.primary.opacity(0.1), lineWidth: 1)
             }
 
+            Text("Bring Your Own Keys")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+
+            BringYourOwnLLMSettings()
+
             Text("Apple Notes")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
@@ -2436,10 +2443,13 @@ private struct NoteAskBar: View {
         } else if turn.isThinking && turn.text.isEmpty {
             ThinkingDots(tint: answerTint)
         } else {
-            // Bold and one flat tone, unlike the panel's accent-blue answers: this text
-            // sits straight on the blurred note with no card to lift it off the page.
-            AnswerText(text: turn.text, tint: answerTint, bold: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            AnswerText(
+                text: turn.text,
+                tint: turn.text == CloudLLM.setupHint
+                    ? Color(nsColor: .systemRed) : answerTint,
+                bold: true
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -2697,7 +2707,11 @@ private struct AIPanel: View {
                 if message.isThinking && message.text.isEmpty {
                     ThinkingDots()
                 } else {
-                    AnswerText(text: message.text)
+                    AnswerText(
+                        text: message.text,
+                        tint: message.text == CloudLLM.setupHint
+                            ? Color(nsColor: .systemRed) : .blue
+                    )
                 }
                 if !message.sources.isEmpty {
                     FlowLayout(spacing: 6) {
@@ -3145,7 +3159,7 @@ private struct ThinkingDots: View {
 /// The system `.switch` draws its off track nearly white, which washed out over
 /// the translucent glass cards in light mode; this draws its own track so both
 /// states read at a glance in either appearance.
-private struct SetupToggleStyle: ToggleStyle {
+struct SetupToggleStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         let on = configuration.isOn
         return Capsule()
@@ -4276,6 +4290,7 @@ private struct SavedSessionView: View {
     /// True once an append recording targeting *this* file has begun, so a later
     /// Stop reloads the newly-written segments from disk.
     @State private var didAppendHere = false
+    @State private var enhanceError: String?
 
     /// A recording is in progress and it's appending into this session.
     private var isAppendingHere: Bool {
@@ -4417,16 +4432,24 @@ private struct SavedSessionView: View {
                 .foregroundStyle(.secondary)
             // Only on the notes side: on the transcript there is nothing to enhance.
             if pane == .notes {
-                HStack(spacing: 10) {
-                    EnhanceBar(templates: enhanceTemplates,
-                               selectedID: $selectedEnhanceTemplateID,
-                               name: enhanceTemplateName,
-                               isEnhancing: isEnhancing,
-                               isAvailable: engine.isAvailable,
-                               unavailableReason: engine.unavailableReason,
-                               onEnhance: onEnhance,
-                               onOpenTemplates: onOpenTemplates)
-                    tasksChip
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 10) {
+                        EnhanceBar(templates: enhanceTemplates,
+                                   selectedID: $selectedEnhanceTemplateID,
+                                   name: enhanceTemplateName,
+                                   isEnhancing: isEnhancing,
+                                   isAvailable: engine.isAvailable,
+                                   unavailableReason: engine.unavailableReason,
+                                   onEnhance: onEnhance,
+                                   onOpenTemplates: onOpenTemplates)
+                        tasksChip
+                    }
+                    if let enhanceError {
+                        Text(enhanceError)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color(nsColor: .systemRed))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .padding(.top, 8)
             }
@@ -4494,6 +4517,7 @@ private struct SavedSessionView: View {
     private func enhance() {
         guard !isEnhancing, engine.isAvailable else { return }
         isEnhancing = true
+        enhanceError = nil
         // Clean the stored transcript with already-learned terms and refresh the
         // displayed segments, so both the transcript pane and the summary read right.
         if store.applyTextTransform({ glossary.correct($0) }, to: url) {
@@ -4554,8 +4578,12 @@ private struct SavedSessionView: View {
             guard let enhanced, target == url else {
                 // Nothing came back — restore what the editor had before streaming.
                 notes = loadedNotes
+                if LLMRouting.usesCloud {
+                    enhanceError = CloudLLM.setupHint
+                }
                 return
             }
+            enhanceError = nil
             let split = SessionStore.splitActionItems(from: enhanced.notesMarkdown)
             let extracted = enhanced.actionItems ?? []
             let merged = SessionStore.mergeTasks(
@@ -4643,9 +4671,13 @@ private struct SavedSessionView: View {
             parts.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
                 .joined(separator: "\n\n")
         )
-        return await engine.enhanceBlock(block, transcript: evidence) { partial in
+        let result = await engine.enhanceBlock(block, transcript: evidence) { partial in
             onPartial(partial)
         }
+        if result == nil, LLMRouting.usesCloud {
+            enhanceError = CloudLLM.setupHint
+        }
+        return result
     }
 
     /// Applies an accepted glossary correction to this note in place — notes,
