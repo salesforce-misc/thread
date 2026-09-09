@@ -26,8 +26,8 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.4.24"
-    CURRENT_PROJECT_VERSION: "28"
+    MARKETING_VERSION: "0.4.25"
+    CURRENT_PROJECT_VERSION: "29"
     GENERATE_INFOPLIST_FILE: NO
 targets:
   Thread:
