@@ -34,7 +34,7 @@ Open the `.dmg` and drag **Thread** to your Applications folder. The build is no
 - **Multiple recordings per session** — Add more recordings to an existing note; each one is timestamped so the timeline stays clear.
 - **Organized your way** — Keep notes in folders you choose, collapse and reorder them, and rename anything with a double-click.
 - **Auto-save** — Your transcript and notes save as you go, so nothing is lost.
-- **Apple Notes** — Optional. Send a saved session into Apple Notes (iCloud or On My Mac) so you can read it there. Thread still keeps the Markdown file on disk; Notes gets a copy.
+- **Apple Notes** — Optional, one-way. Copies a saved session into a Thread folder in Notes (iCloud or On My Mac) and turns the tasks into real checkboxes. No recording files are sent. The next copy replaces anything typed in Notes.
 
 ## How it works
 
@@ -58,7 +58,21 @@ Open the `.dmg` and drag **Thread** to your Applications folder. The build is no
 
 **Full-library search.** An in-memory index over every note's title, notes, and transcript, rebuilt off the main thread and filtered live as you type.
 
-**Apple Notes.** Optional, one-way copy from Thread into Apple Notes. Setup chooses iCloud or On My Mac; Thread does not treat Notes as the source of truth, and turning this on requires Automation access to Notes.
+**Apple Notes.** Optional, one-way copy from Thread into Apple Notes. The Markdown file on your Mac stays the original. Notes is a place to read the copy. The next copy replaces the note, including anything typed there.
+
+No recording file is sent. When you stop a session, or save a summary or tasks, Thread creates a note in a folder named Thread, or updates that note if it is still there. Setup chooses iCloud or On My Mac. The note has four parts: the session title, the summary, the tasks, and the transcript.
+
+The words are written with AppleScript. Notes accepts a small piece of HTML as the note body: headings, paragraphs, and a bullet list. That is enough for the title, the summary, and the transcript. It is not enough for a Notes checklist. A real checklist is the circle you can tap, open or done. That is not an HTML list, and it is not the characters ☐ and ☑︎. Notes stores each checklist row inside the note: the line is marked as a checklist, with its own id, and a flag for open or done. AppleScript never sets that. A task line sent as HTML comes back as a bullet, or as plain text with a ballot box drawn in the letters. Shortcuts for Notes take ordinary text too, so they cannot create the circles. Typing Notes' own checklist shortcut only works while Notes is the frontmost app, and Thread does not bring Notes forward. The script can place the words. It cannot mark those words as a native checklist, and it cannot record which rows are done.
+
+The copy is two steps. First, AppleScript creates or updates the note and sets the body. The task lines are ordinary lines under a Tasks heading, and their text matches the tasks in Thread, including whether each one is open or done. Thread remembers the note's id, so the next copy updates that same note instead of making a duplicate. Second, after the words are saved, Thread quits Notes and edits only the checklist style of those task lines in the Notes database. The wording is left as Notes saved it. Each task line between the Tasks heading and the Transcript heading is matched to a Thread task by its text. A match becomes a real checkbox, open or done to match Thread. Other lines are left alone. Open Notes again to see the circles.
+
+Matching is exact, after trimming space and ignoring a leading ballot box. A blank line is skipped. If a task's text is not on its own line in that section, that task stays as Notes saved it, and Thread tells you which line did not match.
+
+The checklist marks live in `~/Library/Group Containers/group.com.apple.notes/NoteStore.sqlite`. macOS treats that file as private. An app cannot read or write it until you turn on Full Disk Access for Thread. There is no popup. In System Settings, go to Privacy & Security, then Full Disk Access, and turn Thread on. Thread uses that permission for this file only, and only to mark the tasks in the note it just copied. The summary and the transcript are still written by AppleScript, which uses the separate Automation permission for Notes. If Full Disk Access is off, the note is still copied. The tasks just do not become circles. The permission is tied to the app named Thread. A copy named Thread Dev is a different app, and a new install can need the switch turned on again.
+
+Notes keeps the script's version of the note in memory. If Thread marks the checkboxes while Notes is still open, Notes can save the bullet version back over them, and the circles disappear. Quitting Notes lets that save finish. Thread then marks the task lines while nothing else is writing the database. That quit happens on every copy. Open Notes again afterward.
+
+This does not read your other notes, and it does not edit them. A check, a new row, or a deletion in Notes is replaced the next time Thread copies. The database edit does not change the words of the note. Only the checklist style of the matching task lines changes. Changing the text there would corrupt the note, because Notes tracks those characters separately from the style. Only lines in the Tasks section are marked, from the Tasks heading down to the Transcript heading.
 
 ## Requirements
 
@@ -81,7 +95,7 @@ Then build and run the `Thread` scheme. Debug builds install as a separate app (
 
 ### Permissions
 
-macOS will prompt on first use. Each is requested only when the corresponding feature runs:
+macOS will prompt on first use. Each is requested only when the corresponding feature runs. Full Disk Access is the exception: macOS does not prompt, so Thread has to be turned on by hand.
 
 | Permission | Why |
 | --- | --- |
@@ -89,6 +103,7 @@ macOS will prompt on first use. Each is requested only when the corresponding fe
 | Screen Recording | `ScreenCaptureKit` system-audio capture of the other participants |
 | Automation (Chrome) | Reading tab URLs to detect an active Meet call |
 | Automation (Notes) | Optional copy of a saved session into Apple Notes |
+| Full Disk Access | Optional. Marks tasks in that note as real checkboxes. macOS does not prompt; turn Thread on under Privacy & Security |
 | Accessibility | Reading mute state and the active speaker from the meeting's UI |
 
 Thread is intentionally **not** sandboxed (`ENABLE_APP_SANDBOX: NO`) because accessibility inspection of another app's UI is incompatible with the sandbox. Hardened runtime is on, and the entitlements grant only audio input, Apple Events, and user-selected file access.
@@ -115,6 +130,7 @@ You pick one or more library folders; each becomes a section in the sidebar. If 
 | `Thread/Glossary.swift` | Learned vocabulary and transcript correction |
 | `Thread/SessionStore.swift` | Library folders, Markdown read/write, autosave |
 | `Thread/NotesSync.swift` | Optional one-way copy of a session into Apple Notes |
+| `Thread/NotesChecklistWriter.swift` | Turns the copied task lines into native Notes checkboxes |
 | `Thread/RichTextNotes.swift` | Markdown ↔ attributed string, the notes editor |
 | `Thread/Search.swift` | Library-wide search index |
 | `Thread/ContentView.swift` | The app UI |
@@ -168,6 +184,8 @@ By default everything runs locally. Speech recognition uses on-device models, no
 Two things always reach the network, neither carrying your content: macOS downloads the speech recognition model assets from Apple the first time you record in a new language, and Sparkle fetches the appcast to check for updates.
 
 If you turn on **Bring Your Own Keys**, notes and/or audio are sent to OpenAI or Anthropic using a key you paste. That usage is billed to your account. Keys are stored in the Mac Keychain; removing one from Thread does not revoke it at the provider. With both toggles off, your audio, transcripts, and notes never leave your Mac.
+
+Apple Notes sync writes the session text into Notes on this Mac. It does not include recording files. If that Notes account is iCloud, Apple syncs the note the same way it syncs your other notes.
 
 ## Third-party software
 

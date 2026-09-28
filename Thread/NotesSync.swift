@@ -113,6 +113,10 @@ final class NotesSyncController: ObservableObject {
     private var queuedAccount: String?
     private var syncGeneration = 0
     private var keepNotesVisible = false
+    /// Checkboxes are applied after Notes quits, so Notes cannot save the
+    /// bullet version back over them.
+    private var checklistJobs: [String: [NotesChecklistItem]] = [:]
+    private var checklistAnnounce = false
 
     init() {
         folderReady = UserDefaults.standard.bool(forKey: AppSettings.notesSyncFolderReadyKey)
@@ -228,9 +232,84 @@ final class NotesSyncController: ObservableObject {
         guard !isBusy else { return }
         guard let url = pendingQueue.first,
               let store = queuedStore,
-              let account = queuedAccount else { return }
+              let account = queuedAccount else {
+            applyChecklistsAfterNotesQuits(quiet: quiet)
+            return
+        }
         pendingQueue.removeFirst()
         startUpsert(at: url, store: store, account: account, quiet: quiet)
+    }
+
+    /// Notes keeps the AppleScript body in memory and sometimes writes those
+    /// bullets back over the checkbox edit. Quit Notes so that save finishes,
+    /// then mark the task lines while nothing else is writing the database.
+    private func applyChecklistsAfterNotesQuits(quiet: Bool) {
+        let jobs = checklistJobs
+        guard !jobs.isEmpty else { return }
+        checklistJobs.removeAll()
+        let announce = checklistAnnounce || !quiet
+        checklistAnnounce = false
+        isBusy = true
+        Task { @MainActor in
+            await self.quitNotes()
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            var failures: [String] = []
+            for (noteID, items) in jobs {
+                var applied = false
+                var last = ""
+                for attempt in 1...4 {
+                    switch NotesChecklistPatch.apply(noteID: noteID, items: items) {
+                    case .success(let count):
+                        notesSyncLog("native checklist \(count) task(s)")
+                        applied = true
+                    case .failure(let error):
+                        last = error.localizedDescription
+                        let retry = (error as? NotesChecklistError).flatMap { error -> Bool? in
+                            if case .tasksNotFound = error { return true }
+                            return false
+                        } ?? false
+                        if retry, attempt < 4 {
+                            try? await Task.sleep(nanoseconds: 350_000_000)
+                            continue
+                        }
+                    }
+                    break
+                }
+                if !applied, !last.isEmpty {
+                    notesSyncLog("checklist \(last)")
+                    failures.append(last)
+                }
+            }
+            self.isBusy = false
+            self.syncingURL = nil
+            if let message = failures.first {
+                self.lastError = message
+                if announce {
+                    let alert = NSAlert()
+                    alert.messageText = "Couldn’t add Notes checkboxes"
+                    alert.informativeText = message
+                    alert.runModal()
+                }
+            }
+            self.drainQueue(quiet: true)
+        }
+    }
+
+    private func quitNotes() async {
+        let running = NSRunningApplication.runningApplications(withBundleIdentifier: Self.notesBundleID)
+        guard !running.isEmpty else { return }
+        notesSyncLog("quitting Notes before checklist edit")
+        running.forEach { $0.terminate() }
+        let deadline = Date().addingTimeInterval(8)
+        while Date() < deadline {
+            if NSRunningApplication.runningApplications(withBundleIdentifier: Self.notesBundleID).isEmpty {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+        NSRunningApplication.runningApplications(withBundleIdentifier: Self.notesBundleID)
+            .forEach { $0.forceTerminate() }
+        try? await Task.sleep(nanoseconds: 300_000_000)
     }
 
     private func startUpsert(at url: URL, store: SessionStore, account: String, quiet: Bool) {
@@ -244,6 +323,7 @@ final class NotesSyncController: ObservableObject {
         justSynced = false
         syncingURL = url
         keepNotesVisible = Self.notesIsVisible()
+        if !quiet { checklistAnnounce = true }
         armWatchdog()
         let generation = syncGeneration
 
@@ -324,6 +404,9 @@ final class NotesSyncController: ObservableObject {
             folderReady = true
             persistFolderReady()
             notesSyncLog("OK \(title) \(Self.shortNoteID(token))")
+            if !tasks.isEmpty {
+                checklistJobs[token] = tasks.map { NotesChecklistItem(text: $0.text, done: $0.done) }
+            }
             return .success(token)
         case .failure(let error):
             return .failure(error)
@@ -366,6 +449,8 @@ final class NotesSyncController: ObservableObject {
         }
         if !resetFolder && !stopQueue {
             drainQueue(quiet: true)
+        } else {
+            applyChecklistsAfterNotesQuits(quiet: quiet)
         }
     }
 
@@ -376,7 +461,12 @@ final class NotesSyncController: ObservableObject {
         syncWatchdog = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 130_000_000_000)
             guard !Task.isCancelled, generation == syncGeneration, isBusy else { return }
-            fail("Notes didn’t respond. Open System Settings › Privacy & Security › Automation, allow Thread Dev to control Notes, then try Create Folder again.",
+            #if DEBUG
+            let notesApp = "Thread Dev"
+            #else
+            let notesApp = "Thread"
+            #endif
+            fail("Notes didn’t respond. Open System Settings › Privacy & Security › Automation, allow \(notesApp) to control Notes, then try Create Folder again.",
                  resetFolder: true)
         }
     }
@@ -562,8 +652,8 @@ final class NotesSyncController: ObservableObject {
 
 /// Small HTML subset Notes.app accepts via AppleScript `body`. The session
 /// name is the first line so Notes' title matches; then Summary, Tasks,
-/// Transcript. Task checkboxes are unicode; Notes does not create native
-/// checklists from HTML.
+/// Transcript. Task lines are plain text so a later database edit can turn
+/// them into native Notes checkboxes.
 enum NotesHTML {
     static func body(title: String, notes: String, tasks: [TaskItem], transcript: String = "") -> String {
         var parts: [String] = []
@@ -572,18 +662,19 @@ enum NotesHTML {
         let notesHTML = markdownToHTML(notes)
         parts.append(notesHTML.isEmpty ? "<div><br></div>" : notesHTML)
 
+        parts.append("<div><br></div>")
         parts.append("<div><h2>Tasks</h2></div>")
         if tasks.isEmpty {
             parts.append("<div><br></div>")
         } else {
             parts.append("<ul>")
             for task in tasks {
-                let mark = task.done ? "☑︎ " : "☐ "
-                parts.append("<li>\(inlineHTML(mark + task.text))</li>")
+                parts.append("<li>\(inlineHTML(task.text))</li>")
             }
             parts.append("</ul>")
         }
 
+        parts.append("<div><br></div>")
         parts.append("<div><h2>Transcript</h2></div>")
         let transcriptHTML = markdownToHTML(transcript)
         parts.append(transcriptHTML.isEmpty ? "<div><br></div>" : transcriptHTML)
@@ -610,6 +701,9 @@ enum NotesHTML {
             if trimmed.hasPrefix("<!--") { continue }
             if let heading = heading(trimmed) {
                 closeLists()
+                if !html.isEmpty {
+                    html.append("<div><br></div>")
+                }
                 html.append("<div><h\(heading.level)>\(inlineHTML(heading.text))</h\(heading.level)></div>")
                 continue
             }

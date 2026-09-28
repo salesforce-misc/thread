@@ -12,6 +12,7 @@
 		34EFF290E7DE90D03C304A6D /* OpenAITranscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF1FA54C43F2BCFD88B9B212 /* OpenAITranscription.swift */; };
 		365E2768224C71A8E3CD7B6C /* SpeakerVisionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE6FE5B2352353CAD96D0390 /* SpeakerVisionMonitor.swift */; };
 		3852E8124C309D44401A5BCC /* ThreadApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D208D015765D65C9C34BB8E4 /* ThreadApp.swift */; };
+		45F812C07E91354915A941C8 /* NotesChecklistWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61C6848AD82A7236AE7DA7B /* NotesChecklistWriter.swift */; };
 		5350BDA0C9E96363E708CEE4 /* VisualEffectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7CFE572283F0C2EA6702957 /* VisualEffectView.swift */; };
 		5EDAAF59B4601CE34F14B7D8 /* Glossary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C3EF744137E5940F8F4B66C /* Glossary.swift */; };
 		6BF42CA3CC76DC34CF810C50 /* BringYourOwnLLM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288DF50DB185D64BC2E97206 /* BringYourOwnLLM.swift */; };
@@ -61,6 +62,7 @@
 		DD70667AD50EF45C061320C1 /* MeetingDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingDetector.swift; sourceTree = "<group>"; };
 		DE6FE5B2352353CAD96D0390 /* SpeakerVisionMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeakerVisionMonitor.swift; sourceTree = "<group>"; };
 		E741243A58F98CAA9FBA76C3 /* OpenAIChat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIChat.swift; sourceTree = "<group>"; };
+		F61C6848AD82A7236AE7DA7B /* NotesChecklistWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesChecklistWriter.swift; sourceTree = "<group>"; };
 		F9EFF1428E6521EC06E64C86 /* Search.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Search.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -93,6 +95,7 @@
 				DD70667AD50EF45C061320C1 /* MeetingDetector.swift */,
 				4C418A9FC699A0E64C87E868 /* MeetingTranscriber.swift */,
 				09318E1EF0B533DE813A4348 /* Notch.swift */,
+				F61C6848AD82A7236AE7DA7B /* NotesChecklistWriter.swift */,
 				A9A26383C34462B53DED7766 /* NotesSync.swift */,
 				E741243A58F98CAA9FBA76C3 /* OpenAIChat.swift */,
 				AF1FA54C43F2BCFD88B9B212 /* OpenAITranscription.swift */,
@@ -214,6 +217,7 @@
 				0A6A76368F5E3DB3A7FB0A98 /* MeetingDetector.swift in Sources */,
 				C6B69A2EF6C6C552D5287B54 /* MeetingTranscriber.swift in Sources */,
 				957EA31F1AE6828C9CE4F9B8 /* Notch.swift in Sources */,
+				45F812C07E91354915A941C8 /* NotesChecklistWriter.swift in Sources */,
 				EFFDCE5552736E1682C6731D /* NotesSync.swift in Sources */,
 				E43BF9AB58B34334A3D551B7 /* OpenAIChat.swift in Sources */,
 				34EFF290E7DE90D03C304A6D /* OpenAITranscription.swift in Sources */,
@@ -264,7 +268,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 101;
+				CURRENT_PROJECT_VERSION = 102;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -284,7 +288,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0.01;
+				MARKETING_VERSION = 1.0.02;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -330,7 +334,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 101;
+				CURRENT_PROJECT_VERSION = 102;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -344,7 +348,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0.01;
+				MARKETING_VERSION = 1.0.02;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -375,6 +379,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.thread.app.dev;
 				PRODUCT_NAME = "Thread Dev";
 				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG THREAD_DEV";
 				SWIFT_STRICT_CONCURRENCY = minimal;
 			};
 			name = Debug;
