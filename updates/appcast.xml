@@ -3,6 +3,22 @@
     <channel>
         <title>Thread</title>
         <item>
+            <title>1.0.11</title>
+            <pubDate>Tue, 24 Nov 2026 18:32:58 -0700</pubDate>
+            <sparkle:version>111</sparkle:version>
+            <sparkle:shortVersionString>1.0.11</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://raw.githubusercontent.com/salesforce-misc/thread/main/updates/Thread-1.0.11.dmg" length="5340911" type="application/octet-stream" sparkle:edSignature="qhBEfFJ9AuuR8lszCLDR4iNz154Qw1/7M0EL0OR+LQwElCYSnRzapcnb7EvezFZ3XcUoNppeRhIstQn5o5B4Dg=="/>
+            <sparkle:deltas>
+                <enclosure url="https://raw.githubusercontent.com/salesforce-misc/thread/main/updates/Thread111-110.delta" sparkle:deltaFrom="110" length="142650" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="t3L8n5kYAJgOLgy6vaDb9SNAhYCw9OvDCxwf7JQ9L9AmedkgNSIxZvOwuBpVtv25pFdfKlZPtISYd49CReK7Dg=="/>
+                <enclosure url="https://raw.githubusercontent.com/salesforce-misc/thread/main/updates/Thread111-109.delta" sparkle:deltaFrom="109" length="737586" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="9cmLm/vzaKserKHAKgZj/8FxR2sMtfxzShdHJZjF6IDM1fIXQ6BTcWP8VLBoryWQ6NiIlfg6XzLCxTM4BpWmBA=="/>
+                <enclosure url="https://raw.githubusercontent.com/salesforce-misc/thread/main/updates/Thread111-108.delta" sparkle:deltaFrom="108" length="928702" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="OqqruMTA9HpUNt4R1YyRgUhdYj0hSIwntt/foikhfiufQCqL8C2KgtBtmPaIi8RXDhZsA7Y7N14tHSrE+abMAg=="/>
+                <enclosure url="https://raw.githubusercontent.com/salesforce-misc/thread/main/updates/Thread111-107.delta" sparkle:deltaFrom="107" length="1041446" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="l6UEXCZbSUZwTYNii0SgS1Hjqn5jkes4z4F0Sqy4lCJ0AzAVEi/j3hEaeBpKNzPtPnRl/HNlKfLYptVNqA7tBg=="/>
+                <enclosure url="https://raw.githubusercontent.com/salesforce-misc/thread/main/updates/Thread111-102.delta" sparkle:deltaFrom="102" length="1537798" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="2FGa6tuvIRZwv1RgMzDOC85IwYlmM774hfO+8LPho3l42qpN1fqSSrYHJ2X4qu77DCgivKBnTgefeq7S3LiJCg=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>1.0.10</title>
             <pubDate>Tue, 24 Nov 2026 18:10:55 -0700</pubDate>
             <sparkle:version>110</sparkle:version>
@@ -32,21 +48,6 @@
                 <enclosure url="https://raw.githubusercontent.com/salesforce-misc/thread/main/updates/Thread109-102.delta" sparkle:deltaFrom="102" length="1367046" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="ogHkvbdlP7Wbn+KDKRvVJ8LEiW0nUgADNcJb8RjMvSEYaFFbfYsai/DeSY1mlZ+sErwAfkbLaL5SbXUJBiw5Dw=="/>
                 <enclosure url="https://raw.githubusercontent.com/salesforce-misc/thread/main/updates/Thread109-101.delta" sparkle:deltaFrom="101" length="1397218" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="wDI+zYD4272AuyBwRTurVPKcddnQoB1Oaxy/OR3puvsqwg7zuRIwnIb7sPj+IYwqbsw4oJE+6ks3IEc/x4eoAg=="/>
                 <enclosure url="https://raw.githubusercontent.com/salesforce-misc/thread/main/updates/Thread109-100.delta" sparkle:deltaFrom="100" length="1577858" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Wfy4gwrROjuEohXPxTrDiZyAshuA0mIfDDUrrNmu36+EzPhqI9mvDDxXs7YMmzoOrdPAzp9xLDloogK8HEiZBA=="/>
-            </sparkle:deltas>
-        </item>
-        <item>
-            <title>1.0.08</title>
-            <pubDate>Mon, 23 Nov 2026 15:42:08 -0700</pubDate>
-            <sparkle:version>108</sparkle:version>
-            <sparkle:shortVersionString>1.0.08</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://raw.githubusercontent.com/salesforce-misc/thread/main/updates/Thread-1.0.08.dmg" length="4950582" type="application/octet-stream" sparkle:edSignature="GJEHNRnNQWjr0KmS8emHEwlgDl3VxQ4r0KC/N6R6b5JJJ/bnFoYQd5Cqz2pSEkdtN5koSiw1idbjawS896ipDw=="/>
-            <sparkle:deltas>
-                <enclosure url="https://raw.githubusercontent.com/salesforce-misc/thread/main/updates/Thread108-107.delta" sparkle:deltaFrom="107" length="337906" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="fgKCZaWLE73JuJR4dGfwBIZI4r3DOEZX58K7MmPRAza455iJbzt8wKGZnm7Wg1uwzGR5DDVy+ixutWkCbi8jDw=="/>
-                <enclosure url="https://raw.githubusercontent.com/salesforce-misc/thread/main/updates/Thread108-102.delta" sparkle:deltaFrom="102" length="1167374" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="MGby3SsD1HOIHftAMYp62r0U4VrcwcLlQyJn6h1sfjeDfLx1aq0EkWjNLESflQaMyPphRKm4tMYtSyVLE5DQAg=="/>
-                <enclosure url="https://raw.githubusercontent.com/salesforce-misc/thread/main/updates/Thread108-101.delta" sparkle:deltaFrom="101" length="1200630" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="KEWR4qHbwXoGd8Hu6lZbYfwXjIGpIJ+3NaDBhRTEcz80vbyMdHIbaUgyTMYUsFUzo2jmEzaXzmS22uQEd5wUAg=="/>
-                <enclosure url="https://raw.githubusercontent.com/salesforce-misc/thread/main/updates/Thread108-100.delta" sparkle:deltaFrom="100" length="1396442" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="2HaNkm71ELVvi6cKA4VB9w0DILJH/nM/Sl3Cdzn84Wcb6GYKpDL5A3miHo0dkxbE4/u4K1tXVcR+CKb67ZiODw=="/>
             </sparkle:deltas>
         </item>
     </channel>
