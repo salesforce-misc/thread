@@ -60,9 +60,10 @@ final class MeetingTranscriber: LiveTranscriber {
     var onError: ((Error) -> Void)?
 
     private let source: TranscriptionSource
-    private let locale: Locale
-    private let transcriber: SpeechTranscriber
-    private let analyzer: SpeechAnalyzer
+    private let requestedLocale: Locale
+    // Set in `start()` once the requested locale has been resolved to a supported
+    // model and the analyzer is about to start; `stop()` before then is a no-op.
+    private var analyzer: SpeechAnalyzer?
 
     private var inputBuilder: AsyncStream<AnalyzerInput>.Continuation?
     private var analyzerFormat: AVAudioFormat?
@@ -79,18 +80,19 @@ final class MeetingTranscriber: LiveTranscriber {
 
     init(source: TranscriptionSource, locale: Locale = .current) {
         self.source = source
-        self.locale = locale
-        self.transcriber = SpeechTranscriber(
+        self.requestedLocale = locale
+    }
+
+    func start() async throws {
+        let locale = try await resolveLocale()
+        let transcriber = SpeechTranscriber(
             locale: locale,
             transcriptionOptions: [],
             reportingOptions: [.volatileResults, .fastResults],
             attributeOptions: []
         )
-        self.analyzer = SpeechAnalyzer(modules: [transcriber])
-    }
-
-    func start() async throws {
-        try await ensureModelInstalled()
+        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        try await ensureModelInstalled(for: transcriber)
 
         guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
             throw TranscriberError.noAudioFormat
@@ -103,7 +105,7 @@ final class MeetingTranscriber: LiveTranscriber {
         resultsTask = Task { [weak self] in
             guard let self else { return }
             do {
-                for try await result in self.transcriber.results {
+                for try await result in transcriber.results {
                     let text = String(result.text.characters)
                     let receivedUptime = TranscriptionDiagnostics.shared.recordSTTResult(
                         source: self.source,
@@ -124,6 +126,7 @@ final class MeetingTranscriber: LiveTranscriber {
             }
         }
 
+        self.analyzer = analyzer
         try await analyzer.start(inputSequence: stream)
     }
 
@@ -162,19 +165,24 @@ final class MeetingTranscriber: LiveTranscriber {
         inputBuilder = nil
         feedLock.unlock()
         builder?.finish()
-        try? await analyzer.finalizeAndFinishThroughEndOfInput()
+        try? await analyzer?.finalizeAndFinishThroughEndOfInput()
         resultsTask?.cancel()
         resultsTask = nil
     }
 
     // MARK: - Model assets
 
-    private func ensureModelInstalled() async throws {
+    /// Maps the requested locale to one with an on-device model, so a system set
+    /// to e.g. English (Netherlands) still transcribes with an English model.
+    private func resolveLocale() async throws -> Locale {
         let supported = await SpeechTranscriber.supportedLocales
-        let wanted = locale.identifier(.bcp47)
-        guard supported.contains(where: { $0.identifier(.bcp47) == wanted }) else {
-            throw TranscriberError.localeNotSupported(wanted)
+        guard let resolved = SpeechLocaleResolver.resolve(requestedLocale, supported: supported) else {
+            throw TranscriberError.localeNotSupported(requestedLocale.identifier(.bcp47))
         }
+        return resolved
+    }
+
+    private func ensureModelInstalled(for transcriber: SpeechTranscriber) async throws {
         // Returns nil when the required assets are already installed.
         if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
             try await request.downloadAndInstall()
